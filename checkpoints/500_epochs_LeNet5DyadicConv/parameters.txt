@@ -1,0 +1,2 @@
+Model: LeNet5DyadicConv
+Learning rate: 0.001Batch size: 128Number of epochs: 500Train split: 0.9Test split: 0.1

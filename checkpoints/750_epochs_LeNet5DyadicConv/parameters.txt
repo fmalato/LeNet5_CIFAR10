@@ -1,0 +1,4 @@
+Model: LeNet5DyadicConv
+Learning rate: 0.001
+Batch size: 256
+Number of epochs: 750

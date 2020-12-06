@@ -1,0 +1,3 @@
+num epochs: 10
+batch size: 128
+dataset: CIFAR10
