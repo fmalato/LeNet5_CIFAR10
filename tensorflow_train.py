@@ -3,7 +3,8 @@ import datetime
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from tensorflow.keras import layers, models, datasets
+from tensorflow.keras import datasets
+from tensorforce_net import DyadicConvNet
 
 
 if __name__ == '__main__':
@@ -12,21 +13,7 @@ if __name__ == '__main__':
     batch_size = 128
     dataset_name = 'CIFAR10'
     # Network initialization
-    net = models.Sequential()
-    net.add(layers.Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'))
-    net.add(layers.MaxPooling2D(strides=(2, 2)))
-    net.add(layers.Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'))
-    net.add(layers.MaxPooling2D(strides=(2, 2)))
-    net.add(layers.Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='same'))
-    net.add(layers.MaxPooling2D(strides=(2, 2)))
-    net.add(layers.Conv2D(filters=64, kernel_size=(1, 1), activation='relu', padding='same'))
-    net.add(layers.MaxPooling2D(strides=(2, 2)))
-    net.add(layers.Conv2D(filters=64, kernel_size=(1, 1), activation='relu', padding='same'))
-    net.add(layers.MaxPooling2D(strides=(2, 2)))
-    net.add(layers.Flatten())
-    net.add(layers.Dense(64, activation='relu'))
-    net.add(layers.Dense(10))
-    net.build(input_shape=(batch_size, 32, 32, 3))
+    net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
     net.summary()
     # Dataset initialization
     (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
@@ -34,7 +21,7 @@ if __name__ == '__main__':
     class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                    'dog', 'frog', 'horse', 'ship', 'truck']
     # Training
-    with tf.device('/GPU:0'):
+    with tf.device('/device:GPU:0'):
         net.compile(optimizer='adam',
                     loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                     metrics=['accuracy'])

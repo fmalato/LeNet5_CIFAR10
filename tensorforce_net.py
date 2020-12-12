@@ -1,32 +1,32 @@
 import tensorflow as tf
 
 from tensorflow.keras import models, layers
+from tensorforce.agents import Agent
 
 
 class DyadicConvNet(models.Sequential):
 
-    def __init__(self, num_channels=64, kernel_size=(3, 3), stride=(1, 1)):
-        super().__init__()
-
-        self._layers = [
-            ConvBlock(num_channels, kernel_size, stride),
-            ConvBlock(num_channels, kernel_size, stride),
-            ConvBlock(num_channels, kernel_size, stride),
-            ConvBlock(num_channels, kernel_size, stride),
-            ConvBlock(num_channels, kernel_size, stride),
+    def __init__(self, num_channels=64, input_shape=(1, 32, 32, 3)):
+        super().__init__(layers=[
+            layers.Conv2D(filters=num_channels, kernel_size=(3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D(strides=(2, 2)),
+            layers.Conv2D(filters=num_channels, kernel_size=(3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D(strides=(2, 2)),
+            layers.Conv2D(filters=num_channels, kernel_size=(3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D(strides=(2, 2)),
+            layers.Conv2D(filters=num_channels, kernel_size=(1, 1), activation='relu', padding='same'),
+            layers.MaxPooling2D(strides=(2, 2)),
+            layers.Conv2D(filters=num_channels, kernel_size=(1, 1), activation='relu', padding='same'),
+            layers.MaxPooling2D(strides=(2, 2)),
             layers.Flatten(),
             layers.Dense(64, activation='relu'),
+            layers.Dense(64, activation='relu'),
             layers.Dense(10)
-        ]
+        ])
+        self.build(input_shape=input_shape)
 
 
-class ConvBlock(layers.Layer):
-
-    def __init__(self, num_channels=64, kernel_size=(3, 3), stride=(1, 1), name='ConvBlock'):
+class DyadicBaseAgent(Agent):
+    def __init__(self):
         super().__init__()
-
-        self.conv = layers.Conv2D(filters=num_channels, kernel_size=kernel_size, strides=stride, activation='relu')
-        self.pool = layers.MaxPool2D(pool_size=(2, 2))
-        self._name = name
-
 
