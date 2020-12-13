@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 
 from tensorforce.environments import Environment
 
@@ -9,29 +8,41 @@ class DyadicImageEnvironment(Environment):
     def __init__(self, image, net, discount=0.9):
         super().__init__()
         self.image = image
-        self.prediction = net.predict(self.image)
+        self.prediction = net.predict(np.reshape(self.image, (1, 32, 32, 3)))
         self.discount = discount
         self.s = {
-            0: self.image[:, :15, :15, :],
-            1: self.image[:, 16:31, :15, :],
-            2: self.image[:, :15, 16:31, :],
-            3: self.image[:, 16:31, 16:31, :]
+            0: self.image[:16, :16, :],
+            1: self.image[16:, :16, :],
+            2: self.image[:16, 16:, :],
+            3: self.image[16:, 16:, :]
         }
 
     def states(self):
-        return dict(type='float', shape=(15, 15, 3))
+        return dict(observation=dict(type='float', shape=(16, 16, 3)),
+                    distirbution=dict(type='float', shape=10)
+                    )
 
     def actions(self):
-        return dict(type='int', num_values=4)
+        return dict(type='int', num_values=1)
 
     def close(self):
         super().close()
 
     def reset(self):
-        state = self.image[:, :15, :15, :]
+        state = dict(observation=self.image[:16, :16, :],
+                     distribution=np.array([0.1 for i in range(10)]))
         return state
 
     def execute(self, actions, output):
-        next_state = self.s[actions[0]]
-        reward = 1.0*self.discount if np.argmax(output) == np.argmax(self.prediction) else -1.0
+        next_state = dict(observation=self.s[int(np.argmax(actions))],
+                          distribution=output)
+        # if the classification is correct get a reward
+        if np.argmax(output) == np.argmax(self.prediction):
+            reward = 1.0*self.discount
+        else:
+            reward = -1.0
+        # should encourage more accurate predictions by giving a higher reward
+        if np.argmax(output) == np.argmax(self.prediction) and np.max(output) > np.max(self.prediction):
+            reward += 1.0*self.discount
+
         return next_state, reward

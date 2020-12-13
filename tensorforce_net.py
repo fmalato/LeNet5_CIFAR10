@@ -1,7 +1,4 @@
-import tensorflow as tf
-
 from tensorflow.keras import models, layers
-from tensorforce.agents import Agent
 
 
 class DyadicConvNet(models.Sequential):
@@ -24,9 +21,3 @@ class DyadicConvNet(models.Sequential):
             layers.Dense(10)
         ])
         self.build(input_shape=input_shape)
-
-
-class DyadicBaseAgent(Agent):
-    def __init__(self):
-        super().__init__()
-
