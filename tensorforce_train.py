@@ -80,6 +80,7 @@ if __name__ == '__main__':
         avg_reward = 0.0
         while True:
             loop_number += 1
+            # TODO: states['distribution'] is never updated, check if 'actions' contains first policy output
             actions = agent.act(states=states)
             states, reward = environment.execute(actions=actions, output=states['distribution'])
             agent.observe(reward=reward)
