@@ -76,7 +76,7 @@ if __name__ == '__main__':
                              states=dict(
                                  observation=dict(type='float', shape=(16, 16, 3)),
                              ),
-                             # Technically it's a (distribution, actions) tuple
+                             # WORKAROUND: Technically it's a (distribution, actions) tuple
                              actions=dict(type='float', shape=14)
                              )
         states = environment.reset()
