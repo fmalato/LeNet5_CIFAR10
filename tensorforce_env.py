@@ -18,9 +18,7 @@ class DyadicImageEnvironment(Environment):
         }
 
     def states(self):
-        return dict(observation=dict(type='float', shape=(16, 16, 3)),
-                    distirbution=dict(type='float', shape=10)
-                    )
+        return dict(observation=dict(type='float', shape=(16, 16, 3)))
 
     def actions(self):
         return dict(type='int', num_values=1)
@@ -29,13 +27,11 @@ class DyadicImageEnvironment(Environment):
         super().close()
 
     def reset(self):
-        state = dict(observation=self.image[:16, :16, :],
-                     distribution=np.array([0.1 for i in range(10)]))
+        state = dict(observation=self.image[:16, :16, :])
         return state
 
     def execute(self, actions, output):
-        next_state = dict(observation=self.s[int(np.argmax(actions))],
-                          distribution=output)
+        next_state = dict(observation=self.s[int(np.argmax(actions))])
         # if the classification is correct get a reward
         if np.argmax(output) == np.argmax(self.prediction):
             reward = 1.0*self.discount

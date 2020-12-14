@@ -25,13 +25,18 @@ if __name__ == '__main__':
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
+        # Extraction of a random image
         train_image = train_images[random.randint(0, len(train_images) - 1), :, :, :]
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+        # TODO: Not sure about that, but if we need just a single image there's no need for these
         del (train_images, train_labels)
         del (test_images, test_labels)
+        # Environment initialization
         environment = DyadicImageEnvironment(image=train_image, net=net)
+        # Agent initialization
         agent = Agent.create(environment=environment,
                              policy=[
+                                 # First module: from observation to distribution
                                  [
                                      dict(type='retrieve', tensors=['observation']),
                                      # size 16x16
@@ -53,6 +58,7 @@ if __name__ == '__main__':
                                      dict(type='dense', size=10),
                                      dict(type='register', tensor='obs-output')
                                  ],
+                                 # Second module: From distribution to actions
                                  [
                                      dict(type='retrieve', tensors=['obs-output']),
                                      dict(type='flatten'),
@@ -60,6 +66,7 @@ if __name__ == '__main__':
                                      dict(type='dense', size=4),
                                      dict(type='register', tensor='distr-output')
                                  ],
+                                 # Third module: Concatenates outputs from previous modules
                                  [
                                      dict(type='retrieve', aggregation='concat', tensors=['obs-output', 'distr-output'])
                                  ]
@@ -68,28 +75,42 @@ if __name__ == '__main__':
                              objective='policy_gradient', reward_estimation=dict(horizon=20),
                              states=dict(
                                  observation=dict(type='float', shape=(16, 16, 3)),
-                                 distribution=dict(type='float', shape=10)
                              ),
+                             # Technically it's a (distribution, actions) tuple
                              actions=dict(type='float', shape=14)
                              )
         states = environment.reset()
-        scores = net.predict(x=train_image_4dim, batch_size=batch_size)
+        # Fancy (but not needed) visualization of the training image
         if visualization:
+            scores = environment.prediction
             plt.imshow(np.reshape(train_image, (32, 32, 3)))
             plt.show()
             print('Classifier output: {label} ({n} - {c})'.format(label=scores,
                                                                   n=np.argmax(scores),
                                                                   c=class_names[int(np.argmax(scores))]))
+        # Stats initialization
         loop_number = 0
         avg_reward = 0.0
+        rewards = []
+        # Infinite loop: at each timestep, we reward the agent based on how well it performed wrt the classifier
         while True:
             loop_number += 1
             output = agent.act(states=states)
+            # As previously said, the policy outputs are concatenated. Here we separate them
             distribution = output[0:10]
             actions = output[10:14]
             states, reward = environment.execute(actions=actions, output=distribution)
             agent.observe(reward=reward)
+            # Stats update
             avg_reward += reward
+            rewards.append(reward)
             if loop_number % 1000 == 0:
+                hist = np.histogram(rewards, [-1.0, 0.0, 1.0, 1.8])
                 print('Step: {ln}    Average reward: {r}'.format(ln=loop_number, r=avg_reward / 1000))
+                print('Failures: {f}   Worse than classifier: {w}   Better than classifier: {g}'.format(
+                    f=hist[0][0], w=hist[0][1], g=hist[0][2]
+                ))
+                print('---------------------------------------------------------------------------------')
+                # Stats reset
                 avg_reward = 0.0
+                rewards = []
