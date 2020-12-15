@@ -15,3 +15,6 @@ Master Thesis project on Deep Reinforcement Learning.
 
 ### Acknowledgements
 Thanks @SestoAle for providing the _tracker_dense.py_ script.
+
+### Notes:
+- PyTorch net implementation is currently not used, but it's working.
