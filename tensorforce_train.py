@@ -18,6 +18,9 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualization = False
+        # Image is 32x32, make sure grid_rows is a divisor
+        grid_row = 2
+        num_actions = pow(grid_row, 2)
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20201212-125436.h5')
@@ -32,7 +35,7 @@ if __name__ == '__main__':
         del (train_images, train_labels)
         del (test_images, test_labels)
         # Environment initialization
-        environment = DyadicImageEnvironment(image=train_image, net=net)
+        environment = DyadicImageEnvironment(image=train_image, net=net, grid_scale=grid_row)
         # Agent initialization
         agent = Agent.create(environment=environment,
                              policy=[
@@ -63,7 +66,7 @@ if __name__ == '__main__':
                                      dict(type='retrieve', tensors=['obs-output']),
                                      dict(type='flatten'),
                                      dict(type='dense', size=64),
-                                     dict(type='dense', size=4),
+                                     dict(type='dense', size=num_actions),
                                      dict(type='register', tensor='distr-output')
                                  ],
                                  # Third module: Concatenates outputs from previous modules
@@ -74,16 +77,16 @@ if __name__ == '__main__':
                              optimizer=dict(optimizer='adam', learning_rate=1e-3), update=1,
                              objective='policy_gradient', reward_estimation=dict(horizon=20),
                              states=dict(
-                                 observation=dict(type='float', shape=(16, 16, 3)),
+                                 observation=dict(type='float', shape=(int(32 / grid_row), int(32 / grid_row), 3)),
                              ),
                              # WORKAROUND: Technically it's a (distribution, actions) tuple
-                             actions=dict(type='float', shape=14)
+                             actions=dict(type='float', shape=10+num_actions)
                              )
         states = environment.reset()
         # Fancy (but not needed) visualization of the training image
         if visualization:
             scores = environment.prediction
-            plt.imshow(np.reshape(train_image, (32, 32, 3)))
+            plt.imshow(train_image)
             plt.show()
             print('Classifier output: {label} ({n} - {c})'.format(label=scores,
                                                                   n=np.argmax(scores),
@@ -98,7 +101,7 @@ if __name__ == '__main__':
             output = agent.act(states=states)
             # As previously said, the policy outputs are concatenated. Here we separate them
             distribution = output[0:10]
-            actions = output[10:14]
+            actions = output[10:]
             states, reward = environment.execute(actions=actions, output=distribution)
             agent.observe(reward=reward)
             # Stats update

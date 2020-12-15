@@ -43,6 +43,7 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname('models/model_' + dataset_name + '/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
                                 + '.h5'), exist_ok=True)
     net.save('models/model_' + dataset_name + '/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '.h5')
+    # TODO: either make it useful or delete it
     with open('models/model_' + dataset_name + '/' + 'parameters.txt', 'w+') as f:
         f.write('num epochs: ' + str(num_epochs) + '\n')
         f.write('batch size: ' + str(batch_size) + '\n')

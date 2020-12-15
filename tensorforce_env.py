@@ -5,20 +5,23 @@ from tensorforce.environments import Environment
 
 class DyadicImageEnvironment(Environment):
 
-    def __init__(self, image, net, discount=0.9):
+    def __init__(self, image, net, grid_scale=2, discount=0.9):
         super().__init__()
         self.image = image
-        self.prediction = net.predict(np.reshape(self.image, (1, 32, 32, 3)))
+        self.prediction = net.predict(np.reshape(self.image, (1, self.image.shape[0], self.image.shape[1], 3)))
         self.discount = discount
-        self.s = {
-            0: self.image[:16, :16, :],
-            1: self.image[16:, :16, :],
-            2: self.image[:16, 16:, :],
-            3: self.image[16:, 16:, :]
-        }
+        self.state_len = int(self.image.shape[0] / grid_scale)
+        tiles = []
+        for x in range(0, self.image.shape[0], self.state_len):
+            for y in range(0, self.image.shape[1], self.state_len):
+                tiles.append(self.image[x:x+self.state_len, y:y+self.state_len, :])
+        self.s = {}
+        for i in range(len(tiles)):
+            self.s[i] = tiles[i]
+        self.c = 2
 
     def states(self):
-        return dict(observation=dict(type='float', shape=(16, 16, 3)))
+        return dict(observation=dict(type='float', shape=(self.state_len, self.state_len, 3)))
 
     def actions(self):
         return dict(type='int', num_values=1)
@@ -27,7 +30,7 @@ class DyadicImageEnvironment(Environment):
         super().close()
 
     def reset(self):
-        state = dict(observation=self.image[:16, :16, :])
+        state = dict(observation=self.image[:self.state_len, :self.state_len, :])
         return state
 
     def execute(self, actions, output):
