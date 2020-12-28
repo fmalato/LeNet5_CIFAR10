@@ -21,7 +21,7 @@ with tf.device('/device:CPU:0'):
     env = Environment.create(environment=env,
                              max_episode_timesteps=steps_per_episode,
                              states=dict(
-                                 state=dict(type='float', shape=(56, 56, 3))
+                                 image=dict(type='float', shape=(56, 56, 3))
                              ),
                              actions=dict(type='int', num_values=num_actions),
                              visualize=False
