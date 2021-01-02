@@ -1,3 +1,5 @@
+import numpy as np
+
 from tensorflow.keras import models, layers
 
 
@@ -21,3 +23,16 @@ class DyadicConvNet(models.Sequential):
             layers.Dense(10)
         ])
         self.build(input_shape=input_shape)
+
+    def extract_features(self, image):
+        features = {}
+        output = image
+        layer_index = 0
+        for layer in self.layers:
+            output = layer(output)
+            # TODO: MaxPool features?
+            if 'conv2d' in layer.name:
+                features[layer_index] = np.reshape(output.numpy(), (output.shape[1], output.shape[2], output.shape[3]))
+                layer_index += 1
+
+        return features
