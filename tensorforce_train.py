@@ -77,6 +77,7 @@ if __name__ == '__main__':
                              actions=dict(type=int, num_values=num_actions)
                              )
         first_time = True
+        episode = 0
         while True:
             if not first_time:
                 # Extraction of a random image for next episode
@@ -89,7 +90,11 @@ if __name__ == '__main__':
             environment.__setattr__('features', net_features)
             environment.__setattr__('distribution', net_distribution)
             states = environment.reset()
+            cum_reward = 0.0
             for step in range(steps_per_episode):
                 actions = agent.act(states=states)
                 states, terminal, reward = environment.execute(actions=actions)
                 agent.observe(terminal=terminal, reward=reward)
+                cum_reward += reward
+            print('Episode {ep} - Cumulative Reward: {cr}'.format(ep=episode, cr=cum_reward))
+            episode += 1

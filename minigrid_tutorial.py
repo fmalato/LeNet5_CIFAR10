@@ -12,11 +12,11 @@ from gym_minigrid import wrappers
 
 with tf.device('/device:CPU:0'):
     # Parameters initialization
-    steps_per_episode = 150
-    num_episodes = 20000
+    steps_per_episode = 50
+    num_episodes = 10000
     obs_shape = (7, 7, 3)
-    #env_name = 'MiniGrid-Empty-8x8-v0'
-    env_name = 'MiniGrid-LavaGapS7-v0'
+    env_name = 'MiniGrid-Empty-6x6-v0'
+    #env_name = 'MiniGrid-LavaGapS7-v0'
     #env_name = 'MiniGrid-DistShift1-v0'
     # Environment creation
     env = wrappers.gym.make(env_name)
@@ -29,17 +29,30 @@ with tf.device('/device:CPU:0'):
                              visualize=False
                              )
     # Agent creation
-    agent = Agent.create(agent='dqn',
+    """agent = Agent.create(agent='dqn',
                          environment=env,
                          states=dict(type='float', shape=obs_shape),
                          learning_rate=1e-3,
                          memory=100000,
                          batch_size=steps_per_episode,
                          actions=dict(type='int', num_values=num_actions),
-                         exploration=dict(type='linear', unit='timesteps', num_steps=num_episodes*steps_per_episode/2,
+                         exploration=dict(type='linear', unit='timesteps', 
+                                          num_steps=num_episodes*steps_per_episode/2,
                                           initial_value=0.99, final_value=0.2),
                          update_frequency=steps_per_episode,
                          horizon=50
+                         )"""
+    agent = Agent.create(agent='ppo',
+                         environment=env,
+                         states=dict(type='float', shape=obs_shape),
+                         learning_rate=1e-3,
+                         memory=100000,
+                         batch_size=steps_per_episode,
+                         actions=dict(type='int', num_values=num_actions),
+                         exploration=dict(type='linear', unit='timesteps',
+                                          num_steps=num_episodes * steps_per_episode / 2,
+                                          initial_value=0.99, final_value=0.2),
+                         update_frequency=steps_per_episode
                          )
 
     runner = Runner(

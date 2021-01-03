@@ -82,27 +82,32 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count += 1
         done = False
         reward = 0.0
-
+        # TODO: need to update the reward accordingly to a given rule
         if action == self.actions.down:
-            self.agent_pos = (self.agent_pos[0] + 1 if self.agent_pos[0] < len(self.features[self.agent_pos[0]]) - 1 else 0,
-                              int(self.agent_pos[1]/2),
-                              int(self.agent_pos[2]/2))
+            if self.agent_pos[0] < len(self.features) - 1:
+                self.agent_pos = (self.agent_pos[0] + 1,
+                                  int(self.agent_pos[1]/2),
+                                  int(self.agent_pos[2]/2))
         elif action == self.actions.up_top_left:
-            self.agent_pos = (self.agent_pos[0] - 1 if self.agent_pos[0] > 0 else 0,
-                              2*self.agent_pos[1],
-                              2*self.agent_pos[2])
+            if self.agent_pos[0] > 0:
+                self.agent_pos = (self.agent_pos[0] - 1,
+                                  2*self.agent_pos[1],
+                                  2*self.agent_pos[2])
         elif action == self.actions.up_top_right:
-            self.agent_pos = (self.agent_pos[0] - 1 if self.agent_pos[0] > 0 else 0,
-                              2*self.agent_pos[1] + 1,
-                              2*self.agent_pos[2])
+            if self.agent_pos[0] > 0:
+                self.agent_pos = (self.agent_pos[0] - 1,
+                                  2*self.agent_pos[1] + 1,
+                                  2*self.agent_pos[2])
         elif action == self.actions.up_bottom_left:
-            self.agent_pos = (self.agent_pos[0] - 1 if self.agent_pos[0] > 0 else 0,
-                              2*self.agent_pos[1],
-                              2*self.agent_pos[2] + 1)
+            if self.agent_pos[0] > 0:
+                self.agent_pos = (self.agent_pos[0] - 1,
+                                  2*self.agent_pos[1],
+                                  2*self.agent_pos[2] + 1)
         elif action == self.actions.up_bottom_right:
-            self.agent_pos = (self.agent_pos[0] - 1 if self.agent_pos[0] > 0 else 0,
-                              2*self.agent_pos[1] + 1,
-                              2*self.agent_pos[2] + 1)
+            if self.agent_pos[0] > 0:
+                self.agent_pos = (self.agent_pos[0] - 1,
+                                  2*self.agent_pos[1] + 1,
+                                  2*self.agent_pos[2] + 1)
         else:
             assert False, 'unknown action'
 
@@ -110,8 +115,8 @@ class DyadicConvnetGymEnv(gym.Env):
             done = True
 
         obs = self.gen_obs()
-
-        return obs, reward, done
+        # TODO: Why {}?
+        return obs, done, reward, {}
 
     def reset(self):
         # Encoded as (layer, x, y)
@@ -137,9 +142,3 @@ class DyadicConvnetGymEnv(gym.Env):
         }
 
         return obs
-
-    def set_features(self, features):
-        self.features = features
-
-    def set_distribution(self, distribution):
-        self.distribution = distribution
