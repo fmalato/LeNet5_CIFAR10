@@ -65,7 +65,7 @@ class DyadicConvnetGymEnv(gym.Env):
     def __init__(self, features, distribution, max_steps):
         super(DyadicConvnetGymEnv, self).__init__()
         assert type(features) == dict, "parameter 'features' must be a dict"
-        #assert type(distribution) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
+        assert type(distribution) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
         self.features = features
         self.distribution = distribution
         # Will need this for computing the reward

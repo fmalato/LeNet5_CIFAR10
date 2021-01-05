@@ -17,13 +17,13 @@ from grid_drawer import AgentSprite, Drawer
 
 
 if __name__ == '__main__':
-    with tf.device('/device:CPU:0'):
+    with tf.device('/device:GPU:0'):
         # Parameters initialization
         batch_size = 1
         steps_per_episode = 200
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
+        visualize = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20201212-125436.h5')
@@ -75,7 +75,7 @@ if __name__ == '__main__':
                              update=steps_per_episode,
                              objective='policy_gradient',
                              tracking=['tracked_dense'],
-                             reward_estimation=dict(horizon=steps_per_episode),
+                             reward_estimation=dict(horizon=50),
                              states=dict(
                                  features=dict(type=float, shape=(64,)),
                                  distribution=dict(type=float, shape=(10,))

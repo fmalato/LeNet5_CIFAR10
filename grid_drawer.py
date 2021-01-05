@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
-import random, sys, time
 
 
 class Square:
@@ -12,7 +11,7 @@ class Square:
         self.width = width
 
     @staticmethod
-    def draw(self, position):
+    def draw(self):
         tile = np.zeros(shape=(self.width, self.width, 3))
         tile[:, :, 0].fill(0.25)
         tile[:, :, 1].fill(0.25)
@@ -66,7 +65,7 @@ class Drawer:
         self.num_layers = num_layers
         self.grids = {}
         self.tile_width = tile_width
-        self.fig, self.ax = plt.subplots(1, self.num_layers + 1 , figsize=(10, 4), gridspec_kw={'width_ratios': [4, 2, 1, 0.5, 0.25]})
+        self.fig, self.ax = plt.subplots(1, self.num_layers, figsize=(10, 4), gridspec_kw={'width_ratios': [4, 2, 1, 0.5, 0.25]})
         # Show the env name in the window title
         self.fig.canvas.set_window_title('Dyadic conv')
         self.fig.canvas.draw_idle()
@@ -115,7 +114,6 @@ class Drawer:
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
 
-        #self.imshow_obj.set_data(img)
         plt.pause(0.5)
 
     def render_grid(self, key):
