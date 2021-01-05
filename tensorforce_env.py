@@ -3,6 +3,7 @@ import gym
 
 from enum import IntEnum
 from tensorforce.environments import Environment
+from tensorflow.keras.losses import MSE
 from gym import spaces
 from gym_minigrid import envs
 
@@ -64,9 +65,11 @@ class DyadicConvnetGymEnv(gym.Env):
     def __init__(self, features, distribution, max_steps):
         super(DyadicConvnetGymEnv, self).__init__()
         assert type(features) == dict, "parameter 'features' must be a dict"
-        #assert type(features) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
+        #assert type(distribution) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
         self.features = features
         self.distribution = distribution
+        # Will need this for computing the reward
+        self.agent_distribution = None
         self.actions = DyadicConvnetGymEnv.Actions
         self.action_space = spaces.Discrete(len(self.actions))
         self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(64,), dtype=np.float32),
@@ -114,9 +117,17 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.step_count >= self.max_steps:
             done = True
 
+        # TODO: probably a shitty criterion, find a better one
+        if np.argmax(self.agent_distribution) == np.argmax(self.distribution):
+            reward += 1.0
+            if self.agent_distribution[np.argmax(self.agent_distribution)] >= self.distribution[np.argmax(self.distribution)]:
+                reward += 1.0
+        else:
+            reward = -1.0
+
         obs = self.gen_obs()
-        # TODO: Why {}?
-        return obs, done, reward, {}
+        # Why {}?
+        return obs, reward, done, {}
 
     def reset(self):
         # Encoded as (layer, x, y)
