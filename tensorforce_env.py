@@ -85,7 +85,6 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count += 1
         done = False
         reward = 0.0
-        # TODO: need to update the reward accordingly to a given rule
         if action == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,

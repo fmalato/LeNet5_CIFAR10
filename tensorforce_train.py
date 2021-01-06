@@ -14,6 +14,7 @@ from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicImageEnvironment, DyadicConvnetGymEnv
 from tracked_dense import TrackedDense
 from grid_drawer import AgentSprite, Drawer
+from utils import TimeCounter
 
 
 if __name__ == '__main__':
