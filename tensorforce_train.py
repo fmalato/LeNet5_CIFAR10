@@ -3,10 +3,7 @@ import sys
 import datetime
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-
 from tensorforce.agents import Agent
-from tensorforce.execution import Runner
 from tensorforce.environments import Environment
 from tensorflow.keras import datasets
 
@@ -14,17 +11,17 @@ from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicImageEnvironment, DyadicConvnetGymEnv
 from tracked_dense import TrackedDense
 from grid_drawer import AgentSprite, Drawer
-from utils import TimeCounter
 
 
 if __name__ == '__main__':
     with tf.device('/device:GPU:0'):
         # Parameters initialization
         batch_size = 1
-        steps_per_episode = 200
+        steps_per_episode = 100
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
+        load_checkpoint = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20201212-125436.h5')
@@ -52,40 +49,82 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions)
                                          )
         # Agent initialization
-        agent = Agent.create(agent='tensorforce',
-                             environment=environment,
-                             policy=[
-                                 # First module: from observation to distribution
-                                 [
-                                     dict(type='flatten'),
-                                     dict(type='dense', size=256),
-                                     dict(type='dense', size=256),
-                                     dict(type=TrackedDense, size=10),
-                                     dict(type='register', tensor='obs-output')
+        if load_checkpoint:
+            old_episodes = 20000
+            print('Loading checkpoint. Last episode: %d' % old_episodes)
+            agent = Agent.load(directory='models/RL/20210105-192954/',
+                               filename='agent-20.data-00000-of-00001',
+                               environment=environment,
+                               policy=[
+                                   # First module: from observation to distribution
+                                   [
+                                       dict(type='flatten'),
+                                       dict(type='dense', size=128),
+                                       dict(type='dense', size=128),
+                                       dict(type=TrackedDense, size=10),
+                                       dict(type='register', tensor='obs-output')
+                                   ],
+                                   # Second module: From distribution to actions
+                                   [
+                                       dict(type='retrieve', tensors=['obs-output']),
+                                       dict(type='dense', size=64),
+                                       dict(type='dense', size=64),
+                                       dict(type='dense', size=num_actions),
+                                       dict(type='register', tensor='distr-output')
+                                   ]
+                               ],
+                               optimizer=dict(optimizer='adam', learning_rate=1e-3),
+                               update=steps_per_episode,
+                               objective='action_value',
+                               tracking=['tracked_dense'],
+                               reward_estimation=dict(horizon=50, discount=0.9),
+                               states=dict(
+                                   features=dict(type=float, shape=(64,)),
+                                   distribution=dict(type=float, shape=(10,))
+                               ),
+                               memory=100000,
+                               actions=dict(type=int, num_values=num_actions),
+                               exploration=dict(type='linear', unit='timesteps',
+                                                num_steps=5000 * steps_per_episode,
+                                                initial_value=0.99, final_value=0.2)
+                               )
+        else:
+            old_episodes = 0
+            agent = Agent.create(agent='tensorforce',
+                                 environment=environment,
+                                 policy=[
+                                     # First module: from observation to distribution
+                                     [
+                                         dict(type='flatten'),
+                                         dict(type='dense', size=128),
+                                         dict(type='dense', size=128),
+                                         dict(type=TrackedDense, size=10),
+                                         dict(type='register', tensor='obs-output')
+                                     ],
+                                     # Second module: From distribution to actions
+                                     [
+                                         dict(type='retrieve', tensors=['obs-output']),
+                                         dict(type='dense', size=64),
+                                         dict(type='dense', size=64),
+                                         dict(type='dense', size=num_actions),
+                                         dict(type='register', tensor='distr-output')
+                                     ]
                                  ],
-                                 # Second module: From distribution to actions
-                                 [
-                                     dict(type='retrieve', tensors=['obs-output']),
-                                     dict(type='dense', size=64),
-                                     dict(type='dense', size=64),
-                                     dict(type='dense', size=num_actions),
-                                     dict(type='register', tensor='distr-output')
-                                 ]
-                             ],
-                             optimizer=dict(optimizer='adam', learning_rate=1e-3),
-                             update=steps_per_episode,
-                             objective='policy_gradient',
-                             tracking=['tracked_dense'],
-                             reward_estimation=dict(horizon=50),
-                             states=dict(
-                                 features=dict(type=float, shape=(64,)),
-                                 distribution=dict(type=float, shape=(10,))
-                             ),
-                             actions=dict(type=int, num_values=num_actions),
-                             exploration=dict(type='linear', unit='timesteps',
-                                              num_steps=5000 * steps_per_episode,
-                                              initial_value=0.99, final_value=0.2),
-                             )
+                                 optimizer=dict(optimizer='adam', learning_rate=1e-3),
+                                 update=steps_per_episode,
+                                 objective='action_value',
+                                 tracking=['tracked_dense'],
+                                 reward_estimation=dict(horizon=50, discount=0.9),
+                                 states=dict(
+                                     features=dict(type=float, shape=(64,)),
+                                     distribution=dict(type=float, shape=(10,))
+                                 ),
+                                 memory=100000,
+                                 actions=dict(type=int, num_values=num_actions),
+                                 exploration=dict(type='linear', unit='timesteps',
+                                                  num_steps=5000 * steps_per_episode,
+                                                  initial_value=0.99, final_value=0.2),
+                                 )
         first_time = True
         episode = 0
         if visualize:
@@ -120,7 +159,7 @@ if __name__ == '__main__':
                 if visualize:
                     drawer.render(agent=agent_sprite)
                     agent_sprite.move(environment.environment.agent_pos)
-            sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode, cr=cum_reward))
+            sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
             sys.stdout.flush()
             episode += 1
             # Saving model every 1000 episodes
