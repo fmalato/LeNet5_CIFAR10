@@ -114,7 +114,7 @@ class Drawer:
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
 
-        plt.pause(0.5)
+        plt.pause(0.1)
 
     def render_grid(self, key):
         img = np.zeros((key * self.tile_width + 1, key * self.tile_width + 1, 3))

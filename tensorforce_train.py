@@ -50,27 +50,20 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            old_episodes = 20000
+            old_episodes = 29000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210105-192954/',
-                               filename='agent-20.data-00000-of-00001',
+            agent = Agent.load(directory='models/RL/20210108-105203/',
+                               filename='agent-29.data-00000-of-00001',
                                environment=environment,
                                policy=[
                                    # First module: from observation to distribution
                                    [
-                                       dict(type='flatten'),
                                        dict(type='dense', size=128),
                                        dict(type='dense', size=128),
                                        dict(type=TrackedDense, size=10),
-                                       dict(type='register', tensor='obs-output')
-                                   ],
-                                   # Second module: From distribution to actions
-                                   [
-                                       dict(type='retrieve', tensors=['obs-output']),
                                        dict(type='dense', size=64),
                                        dict(type='dense', size=64),
-                                       dict(type='dense', size=num_actions),
-                                       dict(type='register', tensor='distr-output')
+                                       dict(type='dense', size=num_actions)
                                    ]
                                ],
                                optimizer=dict(optimizer='adam', learning_rate=1e-3),
@@ -82,7 +75,7 @@ if __name__ == '__main__':
                                    features=dict(type=float, shape=(64,)),
                                    distribution=dict(type=float, shape=(10,))
                                ),
-                               memory=100000,
+                               memory=dict(type='tensorforce.core.memories.Replay', capacity=10000),
                                actions=dict(type=int, num_values=num_actions),
                                exploration=dict(type='linear', unit='timesteps',
                                                 num_steps=5000 * steps_per_episode,
@@ -90,26 +83,21 @@ if __name__ == '__main__':
                                )
         else:
             old_episodes = 0
-            agent = Agent.create(agent='tensorforce',
+            agent = Agent.create(agent='ppo',
                                  environment=environment,
                                  policy=[
                                      # First module: from observation to distribution
                                      [
-                                         dict(type='flatten'),
                                          dict(type='dense', size=128),
                                          dict(type='dense', size=128),
                                          dict(type=TrackedDense, size=10),
-                                         dict(type='register', tensor='obs-output')
-                                     ],
-                                     # Second module: From distribution to actions
-                                     [
-                                         dict(type='retrieve', tensors=['obs-output']),
                                          dict(type='dense', size=64),
                                          dict(type='dense', size=64),
                                          dict(type='dense', size=num_actions),
-                                         dict(type='register', tensor='distr-output')
                                      ]
                                  ],
+                                 max_episode_timesteps=steps_per_episode,
+                                 batch_size=steps_per_episode,
                                  optimizer=dict(optimizer='adam', learning_rate=1e-3),
                                  update=steps_per_episode,
                                  objective='action_value',
@@ -117,9 +105,8 @@ if __name__ == '__main__':
                                  reward_estimation=dict(horizon=50, discount=0.9),
                                  states=dict(
                                      features=dict(type=float, shape=(64,)),
-                                     distribution=dict(type=float, shape=(10,))
                                  ),
-                                 memory=100000,
+                                 memory=dict(type='tensorforce.core.memories.Replay', capacity=10000),
                                  actions=dict(type=int, num_values=num_actions),
                                  exploration=dict(type='linear', unit='timesteps',
                                                   num_steps=5000 * steps_per_episode,
@@ -149,7 +136,7 @@ if __name__ == '__main__':
             cum_reward = 0.0
             terminal = False
             for step in range(steps_per_episode):
-                action = agent.act(states=state)
+                action = agent.act(states=dict(features=state['features']))
                 # TODO: is there a better solution to extract the distribution?
                 distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
                 environment.environment.agent_distribution = distrib

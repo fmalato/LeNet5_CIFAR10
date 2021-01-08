@@ -123,6 +123,12 @@ class DyadicConvnetGymEnv(gym.Env):
                 reward += 1.0
         else:
             reward = -1.0
+        # Punishing the agent for illegal actions
+        if self.agent_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                                 self.actions.up_top_left, self.actions.up_bottom_left]:
+            reward += -10.0
+        elif self.agent_pos[0] == len(self.features) - 1 and action == self.actions.down:
+            reward += -10.0
 
         obs = self.gen_obs()
         # Why {}?

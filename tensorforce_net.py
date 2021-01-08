@@ -31,7 +31,7 @@ class DyadicConvNet(models.Sequential):
         for layer in self.layers:
             output = layer(output)
             # TODO: MaxPool features?
-            if 'conv2d' in layer.name:
+            if 'pooling' in layer.name:
                 features[layer_index] = np.reshape(output.numpy(), (output.shape[1], output.shape[2], output.shape[3]))
                 layer_index += 1
 
