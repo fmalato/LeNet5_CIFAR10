@@ -21,7 +21,8 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
-        load_checkpoint = False
+        load_checkpoint = True
+        train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20201212-125436.h5')
@@ -50,63 +51,57 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            old_episodes = 29000
+            old_episodes = 8000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210108-105203/',
-                               filename='agent-29.data-00000-of-00001',
+            agent = Agent.load(directory='models/RL/20210109-131217/',
+                               filename='agent-8.data-00000-of-00001',
                                environment=environment,
-                               policy=[
+                               agent='ppo',
+                               network=[
                                    # First module: from observation to distribution
                                    [
                                        dict(type='dense', size=128),
                                        dict(type='dense', size=128),
                                        dict(type=TrackedDense, size=10),
                                        dict(type='dense', size=64),
-                                       dict(type='dense', size=64),
-                                       dict(type='dense', size=num_actions)
+                                       dict(type='dense', size=64)
                                    ]
                                ],
-                               optimizer=dict(optimizer='adam', learning_rate=1e-3),
-                               update=steps_per_episode,
-                               objective='action_value',
+                               learning_rate=1e-3,
+                               max_episode_timesteps=steps_per_episode,
+                               batch_size=steps_per_episode,
                                tracking=['tracked_dense'],
-                               reward_estimation=dict(horizon=50, discount=0.9),
+                               discount=0.99,
                                states=dict(
                                    features=dict(type=float, shape=(64,)),
-                                   distribution=dict(type=float, shape=(10,))
                                ),
-                               memory=dict(type='tensorforce.core.memories.Replay', capacity=10000),
                                actions=dict(type=int, num_values=num_actions),
                                exploration=dict(type='linear', unit='timesteps',
                                                 num_steps=5000 * steps_per_episode,
-                                                initial_value=0.99, final_value=0.2)
+                                                initial_value=0.99, final_value=0.2),
                                )
         else:
             old_episodes = 0
             agent = Agent.create(agent='ppo',
                                  environment=environment,
-                                 policy=[
+                                 network=[
                                      # First module: from observation to distribution
                                      [
                                          dict(type='dense', size=128),
                                          dict(type='dense', size=128),
                                          dict(type=TrackedDense, size=10),
                                          dict(type='dense', size=64),
-                                         dict(type='dense', size=64),
-                                         dict(type='dense', size=num_actions),
+                                         dict(type='dense', size=64)
                                      ]
                                  ],
+                                 learning_rate=1e-3,
                                  max_episode_timesteps=steps_per_episode,
                                  batch_size=steps_per_episode,
-                                 optimizer=dict(optimizer='adam', learning_rate=1e-3),
-                                 update=steps_per_episode,
-                                 objective='action_value',
                                  tracking=['tracked_dense'],
-                                 reward_estimation=dict(horizon=50, discount=0.9),
+                                 discount=0.9,
                                  states=dict(
                                      features=dict(type=float, shape=(64,)),
                                  ),
-                                 memory=dict(type='tensorforce.core.memories.Replay', capacity=10000),
                                  actions=dict(type=int, num_values=num_actions),
                                  exploration=dict(type='linear', unit='timesteps',
                                                   num_steps=5000 * steps_per_episode,
@@ -141,7 +136,8 @@ if __name__ == '__main__':
                 distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
                 environment.environment.agent_distribution = distrib
                 state, terminal, reward = environment.execute(actions=action)
-                agent.observe(terminal=terminal, reward=reward)
+                if train:
+                    agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
                 if visualize:
                     drawer.render(agent=agent_sprite)
