@@ -76,7 +76,7 @@ if __name__ == '__main__':
                                    ]),
                                    # Third module: from lstm output to action
                                    dict(type='block', layers=[
-                                       dict(type='retrieve', name='lstm_output'),
+                                       dict(type='retrieve', tensors=['lstm_output']),
                                        dict(type='dense', size=64, activation='relu')
                                    ])
                                ],
@@ -119,7 +119,7 @@ if __name__ == '__main__':
                                      ]),
                                      # Third module: from lstm output to action
                                      dict(type='block', layers=[
-                                         dict(type='retrieve', name='lstm_output'),
+                                         dict(type='retrieve', tensors=['lstm_output']),
                                          dict(type='dense', size=64, activation='relu')
                                      ])
                                  ],
