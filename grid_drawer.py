@@ -35,10 +35,10 @@ class Grid:
 class AgentSprite:
 
     def __init__(self, rect_width, num_layers):
-        self.position = (0, 0, 0)
+        self.position = (4, 0, 0)
         self.rect_width = rect_width
         self.num_layers = num_layers
-        self.neighborhood = [(1, 0, 0)]
+        self.neighborhood = [(3, 0, 0), (3, 0, 1), (3, 1, 0), (3, 1, 1)]
 
     def move(self, position):
         self.position = position
@@ -114,7 +114,7 @@ class Drawer:
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
 
-        plt.pause(0.1)
+        plt.pause(0.2)
 
     def render_grid(self, key):
         img = np.zeros((key * self.tile_width + 1, key * self.tile_width + 1, 3))

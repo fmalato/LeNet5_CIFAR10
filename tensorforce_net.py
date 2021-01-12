@@ -20,7 +20,7 @@ class DyadicConvNet(models.Sequential):
             layers.Flatten(),
             layers.Dense(64, activation='relu'),
             layers.Dense(64, activation='relu'),
-            layers.Dense(10)
+            layers.Dense(10, activation='softmax')
         ])
         self.build(input_shape=input_shape)
 

@@ -9,7 +9,7 @@ from tensorforce_net import DyadicConvNet
 
 if __name__ == '__main__':
     # Parameters initialization
-    num_epochs = 10
+    num_epochs = 20
     batch_size = 128
     dataset_name = 'CIFAR10'
     # Network initialization
@@ -26,7 +26,7 @@ if __name__ == '__main__':
                     loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                     metrics=['accuracy'])
 
-        history = net.fit(train_images, train_labels, epochs=10,
+        history = net.fit(train_images, train_labels, epochs=num_epochs,
                           validation_data=(test_images, test_labels))
         # Plotting accuracy
         plt.plot(history.history['accuracy'], label='accuracy')

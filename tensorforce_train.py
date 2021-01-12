@@ -20,12 +20,12 @@ if __name__ == '__main__':
         steps_per_episode = 100
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
+        visualize = True
         load_checkpoint = True
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
-        net.load_weights('models/model_CIFAR10/20201212-125436.h5')
+        net.load_weights('models/model_CIFAR10/20210112-134853.h5')
         #net.summary()
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         num_actions = environment.action_space.n
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             features=dict(type=float, shape=(64,)),
+                                             features=dict(type=float, shape=(67,)),
                                              distribution=dict(type=float, shape=(10,))
                                          ),
                                          actions=dict(type=int, num_values=num_actions),
@@ -52,42 +52,69 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            old_episodes = 20000
+            old_episodes = 2000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210112-094836',
-                               filename='agent-8.data-00000-of-00001',
+            agent = Agent.load(directory='models/RL/20210112-163257',
+                               filename='agent-1.data-00000-of-00001',
                                format='checkpoint',
                                environment=environment,
                                agent='ppo',
                                network=[
+                                   # First module: shared dense block
                                    [
-                                       dict(type='dense', size=64),
-                                       dict(type='dense', size=64)
+                                       dict(type='dense', size=64, activation='relu'),
+                                       dict(type='input_lstm', size=64, activation='relu'),
+                                       dict(type='register', name='lstm_output')
+                                   ],
+                                   # Second module: from lstm output to categorical distribution
+                                   [
+                                       dict(type='retrieve', name='lstm_output'),
+                                       dict(type='dense', size=64, activation='relu'),
+                                       dict(type='dense', size=10, activation='softmax'),
+                                       dict(type=TrackedDense)
+                                   ],
+                                   # Third module: from lstm output to action
+                                   [
+                                       dict(type='retrieve', name='lstm_output'),
+                                       dict(type='dense', size=64, activation='relu')
                                    ]
                                ],
-                               learning_rate=1e-6,
+                               learning_rate=1e-5,
                                batch_size=10,
                                tracking=['tracked_dense'],
                                discount=0.99,
                                states=dict(
-                                   features=dict(type=float, shape=(64,)),
+                                   # 64 features + 3 positional coding
+                                   features=dict(type=float, shape=(67,)),
                                ),
                                actions=dict(
                                    action=dict(type=int, num_values=num_actions),
                                    distribution=dict(type=int, num_values=len(class_names))
                                ),
-                               exploration=dict(type='linear', unit='timesteps',
-                                                num_steps=5000 * steps_per_episode,
-                                                initial_value=0.99, final_value=0.2),
+                               entropy_regularization=0.01
                                )
         else:
             old_episodes = 0
             agent = Agent.create(agent='ppo',
                                  environment=environment,
                                  network=[
+                                     # First module: shared dense block
                                      [
-                                         dict(type='dense', size=64),
-                                         dict(type='dense', size=64)
+                                         dict(type='dense', size=64, activation='relu'),
+                                         dict(type='input_lstm', size=64, activation='relu'),
+                                         dict(type='register', name='lstm_output')
+                                     ],
+                                     # Second module: from lstm output to categorical distribution
+                                     [
+                                         dict(type='retrieve', name='lstm_output'),
+                                         dict(type='dense', size=64, activation='relu'),
+                                         dict(type='dense', size=10, activation='softmax'),
+                                         dict(type=TrackedDense)
+                                     ],
+                                     # Third module: from lstm output to action
+                                     [
+                                         dict(type='retrieve', name='lstm_output'),
+                                         dict(type='dense', size=64, activation='relu')
                                      ]
                                  ],
                                  learning_rate=1e-5,
@@ -95,15 +122,14 @@ if __name__ == '__main__':
                                  tracking=['tracked_dense'],
                                  discount=0.99,
                                  states=dict(
-                                     features=dict(type=float, shape=(64,)),
+                                     # 64 features + 3 positional coding
+                                     features=dict(type=float, shape=(67,)),
                                  ),
                                  actions=dict(
                                                 action=dict(type=int, num_values=num_actions),
                                                 distribution=dict(type=int, num_values=len(class_names))
                                               ),
-                                 exploration=dict(type='linear', unit='timesteps',
-                                                  num_steps=5000 * steps_per_episode,
-                                                  initial_value=0.99, final_value=0.2)
+                                 entropy_regularization=0.01
                                  )
         first_time = True
         episode = 0
@@ -135,9 +161,6 @@ if __name__ == '__main__':
                     action = agent.act(states=dict(features=state['features']))
                 else:
                     action = agent.act(states=dict(features=state['features']), independent=True)
-                # TODO: is there a better solution to extract the distribution?
-                #distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
-                #environment.environment.agent_distribution = distrib
                 state, terminal, reward = environment.execute(actions=action)
                 if train:
                     agent.observe(terminal=terminal, reward=reward)
@@ -149,7 +172,7 @@ if __name__ == '__main__':
             sys.stdout.flush()
             episode += 1
             # Saving model every 1000 episodes
-            if episode % 2000 == 0:
+            if episode % 1000 == 0:
                 agent.save(directory='models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S")),
                            filename='agent',
                            format='checkpoint')

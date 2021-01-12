@@ -2,53 +2,7 @@ import numpy as np
 import gym
 
 from enum import IntEnum
-from tensorforce.environments import Environment
-from tensorflow.keras.losses import MSE
 from gym import spaces
-from gym_minigrid import envs
-
-
-class DyadicImageEnvironment(Environment):
-
-    def __init__(self, image, net, grid_scale=2, discount=0.9):
-        super().__init__()
-        self.image = image
-        self.prediction = net.predict(np.reshape(self.image, (1, self.image.shape[0], self.image.shape[1], 3)))
-        self.discount = discount
-        self.state_len = int(self.image.shape[0] / grid_scale)
-        tiles = []
-        for x in range(0, self.image.shape[0], self.state_len):
-            for y in range(0, self.image.shape[1], self.state_len):
-                tiles.append(self.image[x:x+self.state_len, y:y+self.state_len, :])
-        self.s = {}
-        for i in range(len(tiles)):
-            self.s[i] = tiles[i]
-
-    def states(self):
-        return dict(observation=dict(type='float', shape=(self.state_len, self.state_len, 3)))
-
-    def actions(self):
-        return dict(type='int', num_values=1)
-
-    def close(self):
-        super().close()
-
-    def reset(self):
-        state = dict(observation=self.image[:self.state_len, :self.state_len, :])
-        return state
-
-    def execute(self, actions, output):
-        next_state = dict(observation=self.s[int(np.argmax(actions))])
-        # if the classification is correct get a reward
-        if np.argmax(output) == np.argmax(self.prediction):
-            reward = 1.0*self.discount
-        else:
-            reward = -1.0
-        # should encourage more accurate predictions by giving a higher reward
-        if np.argmax(output) == np.argmax(self.prediction) and np.max(output) > np.max(self.prediction):
-            reward += 1.0*self.discount
-
-        return next_state, reward
 
 
 class DyadicConvnetGymEnv(gym.Env):
@@ -72,12 +26,10 @@ class DyadicConvnetGymEnv(gym.Env):
         self.agent_distribution = None
         self.actions = DyadicConvnetGymEnv.Actions
         self.action_space = spaces.Discrete(len(self.actions))
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(64,), dtype=np.float32),
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32),
                                               'distribution': spaces.Box(low=0.0, high=1.0, shape=(10,), dtype=np.float32)
                                               })
-
         self.step_count = 0
-
         self.agent_pos = None
         self.max_steps = max_steps
 
@@ -86,6 +38,7 @@ class DyadicConvnetGymEnv(gym.Env):
         done = False
         reward = 0.0
         action = dict(action)
+        old_pos = self.agent_pos
         if action['action'] == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
@@ -118,18 +71,32 @@ class DyadicConvnetGymEnv(gym.Env):
             done = True
 
         # TODO: probably a shitty criterion, find a better one
-        if action['distribution'] == np.argmax(self.distribution):
-            reward += 1.0
-            """if action['distribution'][np.argmax(action['distribution'])] >= self.distribution[np.argmax(self.distribution)]:
-                reward += 1.0"""
-        else:
-            reward += -1.0
+        """if action['distribution'] == np.argmax(self.distribution):
+            reward += 1.0"""
         # Punishing the agent for illegal actions
-        if self.agent_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                                 self.actions.up_top_left, self.actions.up_bottom_left]:
-            reward += -0.2
-        elif self.agent_pos[0] == len(self.features) - 1 and action == self.actions.down:
-            reward += -0.2
+        if old_pos[0] == 0 and action['action'] in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                                    self.actions.up_top_left, self.actions.up_bottom_left]:
+            reward += -1.0
+        elif old_pos[0] == len(self.features) - 1 and action['action'] == self.actions.down:
+            reward += -1.0
+        else:
+            reward += 1.0
+        """if old_pos[0] == 0:
+            reward += 5.0
+        elif old_pos[0] == 1:
+            reward += 4.0
+        elif old_pos[0] == 2:
+            reward += 3.0
+        elif old_pos[0] == 3:
+            reward += 2.0
+        elif old_pos[0] == 4:
+            reward += 1.0
+            
+        if old_pos[0] == 0 and action['action'] in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                                    self.actions.up_top_left, self.actions.up_bottom_left]:
+            reward += -10.0
+        elif old_pos[0] == len(self.features) - 1 and action['action'] == self.actions.down:
+            reward += -10.0"""
 
         obs = self.gen_obs()
         # Why {}?
@@ -137,10 +104,10 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def reset(self):
         # Encoded as (layer, x, y)
-        self.agent_pos = (0, 0, 0)
+        self.agent_pos = (4, 0, 0)
         self.step_count = 0
         obs = {
-            'features': self.features[0][0][0],
+            'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0),
             'distribution': self.distribution
         }
 
@@ -154,7 +121,8 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def gen_obs(self):
         obs = {
-            'features': self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]],
+            'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]],
+                                       self.agent_pos), axis=0),
             'distribution': self.distribution
         }
 
