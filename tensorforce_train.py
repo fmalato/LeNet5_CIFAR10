@@ -71,8 +71,7 @@ if __name__ == '__main__':
                                    dict(type='block', layers=[
                                        dict(type='retrieve', tensors=['lstm_output']),
                                        dict(type='dense', size=64, activation='relu'),
-                                       dict(type='dense', size=10, activation='softmax'),
-                                       dict(type=TrackedDense)
+                                       dict(type=TrackedDense, activation='softmax')
                                    ]),
                                    # Third module: from lstm output to action
                                    dict(type='block', layers=[
@@ -114,8 +113,7 @@ if __name__ == '__main__':
                                      dict(type='block', layers=[
                                          dict(type='retrieve', tensors=['lstm_output']),
                                          dict(type='dense', size=64, activation='relu'),
-                                         dict(type='dense', size=10, activation='softmax'),
-                                         dict(type=TrackedDense, size=10)
+                                         dict(type=TrackedDense, size=10, activation='softmax')
                                      ]),
                                      # Third module: from lstm output to action
                                      dict(type='block', layers=[
