@@ -20,8 +20,8 @@ if __name__ == '__main__':
         steps_per_episode = 100
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
-        load_checkpoint = True
+        visualize = False
+        load_checkpoint = False
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -61,24 +61,29 @@ if __name__ == '__main__':
                                agent='ppo',
                                network=[
                                    # First module: shared dense block
-                                   [
+                                   dict(type='block', layers=[
                                        dict(type='dense', size=64, activation='relu'),
+                                       dict(type='reshape', shape=(1, 64)),
                                        dict(type='input_lstm', size=64, activation='relu'),
-                                       dict(type='register', name='lstm_output')
-                                   ],
+                                       dict(type='register', tensor='lstm_output')
+                                   ]),
                                    # Second module: from lstm output to categorical distribution
-                                   [
-                                       dict(type='retrieve', name='lstm_output'),
+                                   dict(type='block', layers=[
+                                       dict(type='retrieve', tensors=['lstm_output']),
                                        dict(type='dense', size=64, activation='relu'),
                                        dict(type='dense', size=10, activation='softmax'),
                                        dict(type=TrackedDense)
-                                   ],
+                                   ]),
                                    # Third module: from lstm output to action
-                                   [
+                                   dict(type='block', layers=[
                                        dict(type='retrieve', name='lstm_output'),
                                        dict(type='dense', size=64, activation='relu')
-                                   ]
+                                   ])
                                ],
+                               summarizer=dict(
+                                   directory='data/summaries',
+                                   summaries='all'
+                               ),
                                learning_rate=1e-5,
                                batch_size=10,
                                tracking=['tracked_dense'],
@@ -99,24 +104,29 @@ if __name__ == '__main__':
                                  environment=environment,
                                  network=[
                                      # First module: shared dense block
-                                     [
+                                     dict(type='block', layers=[
                                          dict(type='dense', size=64, activation='relu'),
+                                         dict(type='reshape', shape=(1, 64)),
                                          dict(type='input_lstm', size=64, activation='relu'),
-                                         dict(type='register', name='lstm_output')
-                                     ],
+                                         dict(type='register', tensor='lstm_output')
+                                     ]),
                                      # Second module: from lstm output to categorical distribution
-                                     [
-                                         dict(type='retrieve', name='lstm_output'),
+                                     dict(type='block', layers=[
+                                         dict(type='retrieve', tensors=['lstm_output']),
                                          dict(type='dense', size=64, activation='relu'),
                                          dict(type='dense', size=10, activation='softmax'),
-                                         dict(type=TrackedDense)
-                                     ],
+                                         dict(type=TrackedDense, size=10)
+                                     ]),
                                      # Third module: from lstm output to action
-                                     [
+                                     dict(type='block', layers=[
                                          dict(type='retrieve', name='lstm_output'),
                                          dict(type='dense', size=64, activation='relu')
-                                     ]
+                                     ])
                                  ],
+                                 summarizer=dict(
+                                     directory='data/summaries',
+                                     summaries='all'
+                                 ),
                                  learning_rate=1e-5,
                                  batch_size=10,
                                  tracking=['tracked_dense'],
