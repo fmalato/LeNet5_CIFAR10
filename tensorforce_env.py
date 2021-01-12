@@ -85,27 +85,28 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count += 1
         done = False
         reward = 0.0
-        if action == self.actions.down:
+        action = dict(action)
+        if action['action'] == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
                                   int(self.agent_pos[2]/2))
-        elif action == self.actions.up_top_left:
+        elif action['action'] == self.actions.up_top_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2])
-        elif action == self.actions.up_top_right:
+        elif action['action'] == self.actions.up_top_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2])
-        elif action == self.actions.up_bottom_left:
+        elif action['action'] == self.actions.up_bottom_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2] + 1)
-        elif action == self.actions.up_bottom_right:
+        elif action['action'] == self.actions.up_bottom_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
@@ -117,18 +118,18 @@ class DyadicConvnetGymEnv(gym.Env):
             done = True
 
         # TODO: probably a shitty criterion, find a better one
-        if np.argmax(self.agent_distribution) == np.argmax(self.distribution):
+        if action['distribution'] == np.argmax(self.distribution):
             reward += 1.0
-            if self.agent_distribution[np.argmax(self.agent_distribution)] >= self.distribution[np.argmax(self.distribution)]:
-                reward += 1.0
+            """if action['distribution'][np.argmax(action['distribution'])] >= self.distribution[np.argmax(self.distribution)]:
+                reward += 1.0"""
         else:
-            reward = -1.0
+            reward += -1.0
         # Punishing the agent for illegal actions
         if self.agent_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
                                                  self.actions.up_top_left, self.actions.up_bottom_left]:
-            reward += -10.0
+            reward += -0.2
         elif self.agent_pos[0] == len(self.features) - 1 and action == self.actions.down:
-            reward += -10.0
+            reward += -0.2
 
         obs = self.gen_obs()
         # Why {}?

@@ -8,13 +8,13 @@ from tensorforce.environments import Environment
 from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
-from tensorforce_env import DyadicImageEnvironment, DyadicConvnetGymEnv
+from tensorforce_env import DyadicConvnetGymEnv
 from tracked_dense import TrackedDense
 from grid_drawer import AgentSprite, Drawer
 
 
 if __name__ == '__main__':
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:CPU:0'):
         # Parameters initialization
         batch_size = 1
         steps_per_episode = 100
@@ -47,35 +47,35 @@ if __name__ == '__main__':
                                              features=dict(type=float, shape=(64,)),
                                              distribution=dict(type=float, shape=(10,))
                                          ),
-                                         actions=dict(type=int, num_values=num_actions)
+                                         actions=dict(type=int, num_values=num_actions),
+                                         max_episode_timesteps=steps_per_episode
                                          )
         # Agent initialization
         if load_checkpoint:
-            old_episodes = 8000
+            old_episodes = 20000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210109-131217/',
+            agent = Agent.load(directory='models/RL/20210112-094836',
                                filename='agent-8.data-00000-of-00001',
+                               format='checkpoint',
                                environment=environment,
                                agent='ppo',
                                network=[
-                                   # First module: from observation to distribution
                                    [
-                                       dict(type='dense', size=128),
-                                       dict(type='dense', size=128),
-                                       dict(type=TrackedDense, size=10),
                                        dict(type='dense', size=64),
                                        dict(type='dense', size=64)
                                    ]
                                ],
-                               learning_rate=1e-3,
-                               max_episode_timesteps=steps_per_episode,
-                               batch_size=steps_per_episode,
+                               learning_rate=1e-6,
+                               batch_size=10,
                                tracking=['tracked_dense'],
                                discount=0.99,
                                states=dict(
                                    features=dict(type=float, shape=(64,)),
                                ),
-                               actions=dict(type=int, num_values=num_actions),
+                               actions=dict(
+                                   action=dict(type=int, num_values=num_actions),
+                                   distribution=dict(type=int, num_values=len(class_names))
+                               ),
                                exploration=dict(type='linear', unit='timesteps',
                                                 num_steps=5000 * steps_per_episode,
                                                 initial_value=0.99, final_value=0.2),
@@ -85,35 +85,34 @@ if __name__ == '__main__':
             agent = Agent.create(agent='ppo',
                                  environment=environment,
                                  network=[
-                                     # First module: from observation to distribution
                                      [
-                                         dict(type='dense', size=128),
-                                         dict(type='dense', size=128),
-                                         dict(type=TrackedDense, size=10),
                                          dict(type='dense', size=64),
                                          dict(type='dense', size=64)
                                      ]
                                  ],
-                                 learning_rate=1e-3,
-                                 max_episode_timesteps=steps_per_episode,
-                                 batch_size=steps_per_episode,
+                                 learning_rate=1e-5,
+                                 batch_size=10,
                                  tracking=['tracked_dense'],
-                                 discount=0.9,
+                                 discount=0.99,
                                  states=dict(
                                      features=dict(type=float, shape=(64,)),
                                  ),
-                                 actions=dict(type=int, num_values=num_actions),
+                                 actions=dict(
+                                                action=dict(type=int, num_values=num_actions),
+                                                distribution=dict(type=int, num_values=len(class_names))
+                                              ),
                                  exploration=dict(type='linear', unit='timesteps',
                                                   num_steps=5000 * steps_per_episode,
-                                                  initial_value=0.99, final_value=0.2),
+                                                  initial_value=0.99, final_value=0.2)
                                  )
         first_time = True
         episode = 0
         if visualize:
-            agent_sprite = AgentSprite(rect_width=10, num_layers=5)
-            drawer = Drawer(agent_sprite, num_layers=5, tile_width=10)
+            # Visualization objects
+            tile_width = 10
             num_layers = 5
-            max_tiles = pow(2, num_layers - 1)
+            agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
+            drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
         while True:
             if not first_time:
                 # Extraction of a random image for next episode
@@ -130,11 +129,15 @@ if __name__ == '__main__':
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
-            for step in range(steps_per_episode):
-                action = agent.act(states=dict(features=state['features']))
+            #for step in range(steps_per_episode):
+            while not terminal:
+                if train:
+                    action = agent.act(states=dict(features=state['features']))
+                else:
+                    action = agent.act(states=dict(features=state['features']), independent=True)
                 # TODO: is there a better solution to extract the distribution?
-                distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
-                environment.environment.agent_distribution = distrib
+                #distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
+                #environment.environment.agent_distribution = distrib
                 state, terminal, reward = environment.execute(actions=action)
                 if train:
                     agent.observe(terminal=terminal, reward=reward)
@@ -146,7 +149,7 @@ if __name__ == '__main__':
             sys.stdout.flush()
             episode += 1
             # Saving model every 1000 episodes
-            if episode % 1000 == 0:
+            if episode % 2000 == 0:
                 agent.save(directory='models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S")),
                            filename='agent',
                            format='checkpoint')
