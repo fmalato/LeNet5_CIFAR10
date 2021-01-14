@@ -83,7 +83,9 @@ class TrackedDense(TransformationBase):
         # SESTO: track the tensor, use the mean to avoid batch error
         def fn_tracking():
             return tf.math.reduce_mean(x, axis=0)
+        
+        x = super().apply(x=x)
 
         self.track(label='tracked_dense', name='tracked_dense', data=fn_tracking)
 
-        return super().apply(x=x)
+        return x

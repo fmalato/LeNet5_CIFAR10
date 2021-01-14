@@ -1,5 +1,5 @@
 import random
-import sys
+import sys, subprocess
 import datetime
 import operator
 import numpy as np
@@ -7,7 +7,6 @@ import tensorflow as tf
 from tensorforce.agents import Agent
 from tensorforce.environments import Environment
 from tensorflow.keras import datasets
-from tensorflow import TensorSpec
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
@@ -35,7 +34,7 @@ if __name__ == '__main__':
         # Extraction of a random image
         image_index = random.randint(0, len(train_images) - 1)
         train_image = train_images[image_index, :, :, :]
-        train_label = train_labels[image_index]
+        train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
         # Convolutional features extraction
         net_features = net.extract_features(train_image_4dim)
@@ -49,7 +48,7 @@ if __name__ == '__main__':
         num_actions = environment.action_space.n
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             features=dict(type=float, shape=(67,)),
+                                             features=dict(type=float, shape=(74,)),
                                              distribution=dict(type=float, shape=(10,))
                                          ),
                                          actions=dict(type=int, num_values=num_actions),
@@ -59,8 +58,8 @@ if __name__ == '__main__':
         if load_checkpoint:
             old_episodes = 2000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210113-143724',
-                               filename='agent-12.data-00000-of-00001',
+            agent = Agent.load(directory='models/RL/20210114-125411',
+                               filename='agent-2.data-00000-of-00001',
                                format='checkpoint',
                                environment=environment,
                                agent='ppo',
@@ -87,19 +86,20 @@ if __name__ == '__main__':
                                    directory='data/summaries',
                                    summaries='all'
                                ),
-                               learning_rate=1e-3,
+                               learning_rate=1e-4,
                                batch_size=10,
                                tracking=['tracked_dense'],
                                discount=0.99,
                                states=dict(
                                    # 64 features + 10 distribution + 3 positional coding
-                                   features=dict(type=float, shape=(77,)),
+                                   features=dict(type=float, shape=(74,)),
                                ),
                                actions=dict(
                                    action=dict(type=int, num_values=num_actions),
                                    distribution=dict(type=int, num_values=len(class_names))
                                ),
-                               entropy_regularization=0.01
+                               entropy_regularization=0.01,
+                               exploration=0.1
                                )
         else:
             old_episodes = 0
@@ -128,19 +128,20 @@ if __name__ == '__main__':
                                      directory='data/summaries',
                                      summaries='all'
                                  ),
-                                 learning_rate=1e-3,
+                                 learning_rate=1e-4,
                                  batch_size=10,
                                  tracking=['tracked_dense'],
                                  discount=0.99,
                                  states=dict(
                                      # 64 features + 10 distribution + 3 positional coding
-                                     features=dict(type=float, shape=(77,)),
+                                     features=dict(type=float, shape=(74,)),
                                  ),
                                  actions=dict(
                                                 action=dict(type=int, num_values=num_actions),
                                                 distribution=dict(type=int, num_values=len(class_names))
                                               ),
-                                 entropy_regularization=0.01
+                                 entropy_regularization=0.01,
+                                 exploration=0.1
                                  )
         first_time = True
         episode = 0
@@ -155,7 +156,7 @@ if __name__ == '__main__':
                 # Extraction of a random image for next episode
                 image_index = random.randint(0, len(train_images) - 1)
                 train_image = train_images[image_index, :, :, :]
-                train_label = train_labels[image_index]
+                train_label = int(train_labels[image_index])
                 train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
                 # Convolutional features extraction
                 net_features = net.extract_features(train_image_4dim)
@@ -163,21 +164,22 @@ if __name__ == '__main__':
                 # Environment reset with new features and distribution
                 environment.environment.features = net_features
                 environment.environment.distribution = net_distribution
-                environment.environment.image_label = train_label
+                environment.environment.image_class = train_label
             else:
                 first_time = False
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
             while not terminal:
-                action = agent.act(states=dict(features=state['features']), independent=operator.not_(train))
+                action = agent.act(states=dict(features=state['features']))
                 distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
                 environment.environment.agent_classification = distrib
                 state, terminal, reward = environment.execute(actions=action)
-                if train:
-                    agent.observe(terminal=terminal, reward=reward)
+                agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
                 if visualize:
+                    print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
+                                                                             p=class_names[action['distribution']]))
                     drawer.render(agent=agent_sprite)
                     agent_sprite.move(environment.environment.agent_pos)
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
