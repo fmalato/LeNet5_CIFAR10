@@ -1,5 +1,6 @@
 import random
 import sys
+import os
 import datetime
 import numpy as np
 import tensorflow as tf
@@ -18,6 +19,8 @@ if __name__ == '__main__':
         # Parameters initialization
         batch_size = 1
         steps_per_episode = 30
+        policy_lr = 1e-5
+        baseline_lr = 1e-3
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = True
@@ -55,10 +58,11 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            old_episodes = 2000
+            directory = 'models/RL/20210120-135411/'
+            old_episodes = (len(os.listdir(directory)) - 1) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210119-163439',
-                               filename='agent',
+            agent = Agent.load(directory=directory,
+                               filename='agent-15000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -77,17 +81,17 @@ if __name__ == '__main__':
                                    dict(type='dense', size=64, activation='relu'),
                                    dict(type='dense', size=64, activation='relu')
                                ],
-                               baseline_optimizer=dict(optimizer='adam', learning_rate=1e-3),
+                               baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                summarizer=dict(
                                    directory='data/summaries',
                                    summaries='all'
                                ),
-                               learning_rate=1e-5,
+                               learning_rate=policy_lr,
                                batch_size=10,
                                tracking=['tracked_dense'],
                                discount=0.99,
                                states=dict(
-                                   # 64 features + 10 distribution + 3 positional coding
+                                   # 64 features + 3 positional coding
                                    features=dict(type=float, shape=(67,)),
                                ),
                                actions=dict(type=int, num_values=num_actions),
@@ -117,7 +121,7 @@ if __name__ == '__main__':
                                        directory='data/summaries',
                                        summaries='all'
                                    ),
-                                 learning_rate=1e-5,
+                                 learning_rate=policy_lr,
                                  batch_size=10,
                                  tracking=['tracked_dense'],
                                  discount=0.99,
@@ -130,6 +134,7 @@ if __name__ == '__main__':
                                  )
         first_time = True
         episode = 0
+        save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         if visualize:
             # Visualization objects
             tile_width = 10
@@ -173,6 +178,11 @@ if __name__ == '__main__':
             episode += 1
             # Saving model every 1000 episodes
             if episode % 1000 == 0:
-                agent.save(directory='models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S")),
-                           filename='agent',
+                agent.save(directory=save_dir,
+                           filename='agent-{ep}'.format(ep=episode),
                            format='hdf5')
+                with open(save_dir + '/parameters.txt', 'w+') as f:
+                    f.write('image index: %d \n' % image_index)
+                    f.write('policy learning rate: %f \n' % policy_lr)
+                    f.write('baseline learning rate: %f \n' % baseline_lr)
+                    f.write('episode length: %d \n' % steps_per_episode)

@@ -35,7 +35,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.actions))
         # 64 conv features + 10 categorical distribution from classifier + 3 position
         self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32),
-                                              'distribution': spaces.Box(low=0.0, high=1.0, shape=(10,), dtype=np.float32)
+                                              #'distribution': spaces.Box(low=0.0, high=1.0, shape=(10,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
@@ -99,7 +99,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count = 0
         obs = {
             'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0),
-            'distribution': self.distribution
+            #'distribution': self.distribution
         }
 
         return obs
@@ -114,7 +114,7 @@ class DyadicConvnetGymEnv(gym.Env):
         obs = {
             'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]],
                                         self.agent_pos), axis=0),
-            'distribution': self.agent_classification
+            #'distribution': self.agent_classification
         }
 
         return obs
