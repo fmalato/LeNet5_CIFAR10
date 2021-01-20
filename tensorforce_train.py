@@ -1,7 +1,6 @@
 import random
-import sys, subprocess
+import sys
 import datetime
-import operator
 import numpy as np
 import tensorflow as tf
 from tensorforce.agents import Agent
@@ -21,8 +20,8 @@ if __name__ == '__main__':
         steps_per_episode = 30
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
-        load_checkpoint = False
+        visualize = True
+        load_checkpoint = True
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -48,8 +47,8 @@ if __name__ == '__main__':
         num_actions = environment.action_space.n
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             features=dict(type=float, shape=(74,)),
-                                             distribution=dict(type=float, shape=(10,))
+                                             # 64 features + 3 positional coding
+                                             features=dict(type=float, shape=(67,)),
                                          ),
                                          actions=dict(type=int, num_values=num_actions),
                                          max_episode_timesteps=steps_per_episode
@@ -58,90 +57,76 @@ if __name__ == '__main__':
         if load_checkpoint:
             old_episodes = 2000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
-            agent = Agent.load(directory='models/RL/20210114-125411',
-                               filename='agent-2.data-00000-of-00001',
-                               format='checkpoint',
+            agent = Agent.load(directory='models/RL/20210119-163439',
+                               filename='agent',
+                               format='hdf5',
                                environment=environment,
                                agent='ppo',
                                network=[
                                    # First module: shared dense block
                                    [
                                        dict(type='dense', size=64, activation='relu'),
-                                       dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                       dict(type='register', tensor='lstm_output')
-                                   ],
-                                   # Second module: from lstm output to categorical distribution
-                                   [
-                                       dict(type='retrieve', tensors=['lstm_output']),
                                        dict(type='dense', size=64, activation='relu'),
-                                       dict(type=TrackedDense, size=10, activation='softmax')
-                                   ],
-                                   # Third module: from lstm output to action
-                                   [
-                                       dict(type='retrieve', tensors=['lstm_output']),
+                                       dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
+                                       dict(type=TrackedDense, size=10, activation='softmax'),
                                        dict(type='dense', size=64, activation='relu')
-                                   ]
+                                   ],
+
                                ],
+                               baseline=[
+                                   dict(type='dense', size=64, activation='relu'),
+                                   dict(type='dense', size=64, activation='relu')
+                               ],
+                               baseline_optimizer=dict(optimizer='adam', learning_rate=1e-3),
                                summarizer=dict(
                                    directory='data/summaries',
                                    summaries='all'
                                ),
-                               learning_rate=1e-4,
+                               learning_rate=1e-5,
                                batch_size=10,
                                tracking=['tracked_dense'],
                                discount=0.99,
                                states=dict(
                                    # 64 features + 10 distribution + 3 positional coding
-                                   features=dict(type=float, shape=(74,)),
+                                   features=dict(type=float, shape=(67,)),
                                ),
-                               actions=dict(
-                                   action=dict(type=int, num_values=num_actions),
-                                   distribution=dict(type=int, num_values=len(class_names))
-                               ),
-                               entropy_regularization=0.01,
-                               exploration=0.1
+                               actions=dict(type=int, num_values=num_actions),
+                               entropy_regularization=0.01
                                )
         else:
             old_episodes = 0
-            agent = Agent.create(agent='ppo',
-                                 environment=environment,
+            agent = Agent.create(environment=environment,
+                                 agent='ppo',
                                  network=[
-                                     # First module: shared dense block
-                                     [
-                                         dict(type='dense', size=64, activation='relu'),
-                                         dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                         dict(type='register', tensor='lstm_output')
-                                     ],
-                                     # Second module: from lstm output to categorical distribution
-                                     [
-                                         dict(type='retrieve', tensors=['lstm_output']),
-                                         dict(type='dense', size=64, activation='relu'),
-                                         dict(type=TrackedDense, size=10, activation='softmax')
-                                     ],
-                                     # Third module: from lstm output to action
-                                     [
-                                         dict(type='retrieve', tensors=['lstm_output']),
-                                         dict(type='dense', size=64, activation='relu')
-                                     ]
+                                       # First module: shared dense block
+                                       [
+                                           dict(type='dense', size=64, activation='relu'),
+                                           dict(type='dense', size=64, activation='relu'),
+                                           dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
+                                           dict(type=TrackedDense, size=10, activation='softmax'),
+                                           dict(type='dense', size=64, activation='relu')
+                                       ],
+
+                                   ],
+                                 baseline=[
+                                     dict(type='dense', size=64, activation='relu'),
+                                     dict(type='dense', size=64, activation='relu')
                                  ],
+                                 baseline_optimizer=dict(optimizer='adam', learning_rate=1e-3),
                                  summarizer=dict(
-                                     directory='data/summaries',
-                                     summaries='all'
-                                 ),
-                                 learning_rate=1e-4,
+                                       directory='data/summaries',
+                                       summaries='all'
+                                   ),
+                                 learning_rate=1e-5,
                                  batch_size=10,
                                  tracking=['tracked_dense'],
                                  discount=0.99,
                                  states=dict(
-                                     # 64 features + 10 distribution + 3 positional coding
-                                     features=dict(type=float, shape=(74,)),
-                                 ),
-                                 actions=dict(
-                                                action=dict(type=int, num_values=num_actions),
-                                                distribution=dict(type=int, num_values=len(class_names))
-                                              ),
-                                 entropy_regularization=0.01,
-                                 exploration=0.1
+                                       # 64 features + 3 positional coding
+                                       features=dict(type=float, shape=(67,)),
+                                   ),
+                                 actions=dict(type=int, num_values=num_actions),
+                                 entropy_regularization=0.01
                                  )
         first_time = True
         episode = 0
@@ -152,7 +137,8 @@ if __name__ == '__main__':
             agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
         while True:
-            if not first_time:
+            # Only one image for now
+            """if not first_time:
                 # Extraction of a random image for next episode
                 image_index = random.randint(0, len(train_images) - 1)
                 train_image = train_images[image_index, :, :, :]
@@ -166,7 +152,7 @@ if __name__ == '__main__':
                 environment.environment.distribution = net_distribution
                 environment.environment.image_class = train_label
             else:
-                first_time = False
+                first_time = False"""
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
@@ -179,7 +165,7 @@ if __name__ == '__main__':
                 cum_reward += reward
                 if visualize:
                     print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
-                                                                             p=class_names[action['distribution']]))
+                                                                             p=class_names[int(np.argmax(distrib))]))
                     drawer.render(agent=agent_sprite)
                     agent_sprite.move(environment.environment.agent_pos)
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
@@ -189,4 +175,4 @@ if __name__ == '__main__':
             if episode % 1000 == 0:
                 agent.save(directory='models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S")),
                            filename='agent',
-                           format='checkpoint')
+                           format='hdf5')
