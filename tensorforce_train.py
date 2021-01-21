@@ -34,7 +34,8 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extraction of a random image
-        image_index = random.randint(0, len(train_images) - 1)
+        #image_index = random.randint(0, len(train_images) - 1)
+        image_index = 1614
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -58,11 +59,11 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210120-135411/'
+            directory = 'models/RL/20210120-201518/'
             old_episodes = (len(os.listdir(directory)) - 1) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-15000',
+                               filename='agent-19000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
