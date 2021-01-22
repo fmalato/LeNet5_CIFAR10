@@ -19,12 +19,12 @@ if __name__ == '__main__':
         # Parameters initialization
         batch_size = 1
         steps_per_episode = 30
-        policy_lr = 1e-5
-        baseline_lr = 1e-3
+        policy_lr = 1e-3
+        baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
-        load_checkpoint = True
+        visualize = False
+        load_checkpoint = False
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -34,8 +34,8 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extraction of a random image
-        #image_index = random.randint(0, len(train_images) - 1)
-        image_index = 1614
+        image_index = random.randint(0, len(train_images) - 1)
+        #image_index = 1614
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -159,6 +159,43 @@ if __name__ == '__main__':
                 environment.environment.image_class = train_label
             else:
                 first_time = False"""
+            # new image after 500 episodes
+            if episode == 500:
+                prev_index = image_index
+                prev_image = train_image
+                prev_label = train_label
+                prev_features = net_features
+                prev_distrib = net_distribution
+                while True:
+                    image_index = random.randint(0, len(train_images) - 1)
+                    if int(train_labels[image_index]) != train_label:
+                        break
+                train_image = train_images[image_index, :, :, :]
+                train_label = int(train_labels[image_index])
+                train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+                # Convolutional features extraction
+                net_features = net.extract_features(train_image_4dim)
+                net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+                # Environment reset with new features and distribution
+                environment.environment.features = net_features
+                environment.environment.distribution = net_distribution
+                environment.environment.image_class = train_label
+            # switching image every 500 episodes
+            if episode % 500 == 0 and episode > 500:
+                tmp_img = prev_image
+                tmp_label = prev_label
+                tmp_index = prev_index
+                environment.environment.features = prev_features
+                environment.environment.distribution = prev_distrib
+                environment.environment.image_class = prev_label
+                prev_index = image_index
+                prev_image = train_image
+                prev_label = train_label
+                image_index = tmp_index
+                train_image = tmp_img
+                train_label = tmp_label
+                prev_features = net_features
+                prev_distrib = net_distribution
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
@@ -183,7 +220,7 @@ if __name__ == '__main__':
                            filename='agent-{ep}'.format(ep=episode),
                            format='hdf5')
                 with open(save_dir + '/parameters.txt', 'w+') as f:
-                    f.write('image index: %d \n' % image_index)
+                    f.write('image index: %d, %d \n' % (image_index, prev_index))
                     f.write('policy learning rate: %f \n' % policy_lr)
                     f.write('baseline learning rate: %f \n' % baseline_lr)
                     f.write('episode length: %d \n' % steps_per_episode)
