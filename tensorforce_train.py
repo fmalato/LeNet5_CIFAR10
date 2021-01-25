@@ -26,6 +26,7 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = False
         train = True
+        prev_index = -1
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210112-134853.h5')
@@ -63,7 +64,7 @@ if __name__ == '__main__':
             old_episodes = (len(os.listdir(directory)) - 1) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-19000',
+                               filename='agent-9000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -160,7 +161,7 @@ if __name__ == '__main__':
             else:
                 first_time = False"""
             # new image after 500 episodes
-            if episode == 500:
+            """if episode == 500:
                 prev_index = image_index
                 prev_image = train_image
                 prev_label = train_label
@@ -195,16 +196,23 @@ if __name__ == '__main__':
                 train_image = tmp_img
                 train_label = tmp_label
                 prev_features = net_features
-                prev_distrib = net_distribution
+                prev_distrib = net_distribution"""
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
+            if not train:
+                internals = agent.initial_internals()
             while not terminal:
-                action = agent.act(states=dict(features=state['features']))
+                if train:
+                    action = agent.act(states=dict(features=state['features']))
+                else:
+                    action, internals = agent.act(states=dict(features=state['features']), internals=internals,
+                                                  independent=True, deterministic=True)
                 distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
                 environment.environment.agent_classification = distrib
                 state, terminal, reward = environment.execute(actions=action)
-                agent.observe(terminal=terminal, reward=reward)
+                if train:
+                    agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
                 if visualize:
                     print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],

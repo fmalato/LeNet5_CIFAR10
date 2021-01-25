@@ -1,5 +1,6 @@
 import time
 import json
+import random
 import numpy as np
 
 
@@ -25,3 +26,14 @@ class TimeCounter:
             self.stats[key] = np.sum(self.stats[key]) / len(self.stats[key])
         with open('stats.json', 'w+') as f:
             json.dump(self.stats, f)
+
+
+def select_images(num_images, max_range):
+    indexes = []
+    for i in range(num_images):
+        while True:
+            index = random.randint(0, max_range - 1)
+            if index not in indexes:
+                break
+
+    return indexes
