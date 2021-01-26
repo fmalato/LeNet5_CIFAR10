@@ -23,8 +23,8 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
-        load_checkpoint = False
+        visualize = True
+        load_checkpoint = True
         train = True
         prev_index = -1
         # Network initialization
@@ -35,8 +35,8 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extraction of a random image
-        image_index = random.randint(0, len(train_images) - 1)
-        #image_index = 1614
+        #image_index = random.randint(0, len(train_images) - 1)
+        image_index = 1614
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -64,7 +64,7 @@ if __name__ == '__main__':
             old_episodes = (len(os.listdir(directory)) - 1) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-9000',
+                               filename='agent-12000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -143,92 +143,55 @@ if __name__ == '__main__':
             num_layers = 5
             agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
-        while True:
-            # Only one image for now
-            """if not first_time:
-                # Extraction of a random image for next episode
-                image_index = random.randint(0, len(train_images) - 1)
-                train_image = train_images[image_index, :, :, :]
-                train_label = int(train_labels[image_index])
-                train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
-                # Convolutional features extraction
-                net_features = net.extract_features(train_image_4dim)
-                net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-                # Environment reset with new features and distribution
-                environment.environment.features = net_features
-                environment.environment.distribution = net_distribution
-                environment.environment.image_class = train_label
-            else:
-                first_time = False"""
-            # new image after 500 episodes
-            """if episode == 500:
-                prev_index = image_index
-                prev_image = train_image
-                prev_label = train_label
-                prev_features = net_features
-                prev_distrib = net_distribution
-                while True:
+            while True:
+                # Only one image for now
+                """if not first_time:
+                    # Extraction of a random image for next episode
                     image_index = random.randint(0, len(train_images) - 1)
-                    if int(train_labels[image_index]) != train_label:
-                        break
-                train_image = train_images[image_index, :, :, :]
-                train_label = int(train_labels[image_index])
-                train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
-                # Convolutional features extraction
-                net_features = net.extract_features(train_image_4dim)
-                net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-                # Environment reset with new features and distribution
-                environment.environment.features = net_features
-                environment.environment.distribution = net_distribution
-                environment.environment.image_class = train_label
-            # switching image every 500 episodes
-            if episode % 500 == 0 and episode > 500:
-                tmp_img = prev_image
-                tmp_label = prev_label
-                tmp_index = prev_index
-                environment.environment.features = prev_features
-                environment.environment.distribution = prev_distrib
-                environment.environment.image_class = prev_label
-                prev_index = image_index
-                prev_image = train_image
-                prev_label = train_label
-                image_index = tmp_index
-                train_image = tmp_img
-                train_label = tmp_label
-                prev_features = net_features
-                prev_distrib = net_distribution"""
-            state = environment.reset()
-            cum_reward = 0.0
-            terminal = False
-            if not train:
-                internals = agent.initial_internals()
-            while not terminal:
-                if train:
-                    action = agent.act(states=dict(features=state['features']))
+                    train_image = train_images[image_index, :, :, :]
+                    train_label = int(train_labels[image_index])
+                    train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+                    # Convolutional features extraction
+                    net_features = net.extract_features(train_image_4dim)
+                    net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+                    # Environment reset with new features and distribution
+                    environment.environment.features = net_features
+                    environment.environment.distribution = net_distribution
+                    environment.environment.image_class = train_label
                 else:
-                    action, internals = agent.act(states=dict(features=state['features']), internals=internals,
-                                                  independent=True, deterministic=True)
-                distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
-                environment.environment.agent_classification = distrib
-                state, terminal, reward = environment.execute(actions=action)
-                if train:
-                    agent.observe(terminal=terminal, reward=reward)
-                cum_reward += reward
-                if visualize:
-                    print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
-                                                                             p=class_names[int(np.argmax(distrib))]))
-                    drawer.render(agent=agent_sprite)
-                    agent_sprite.move(environment.environment.agent_pos)
-            sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
-            sys.stdout.flush()
-            episode += 1
-            # Saving model every 1000 episodes
-            if episode % 1000 == 0:
-                agent.save(directory=save_dir,
-                           filename='agent-{ep}'.format(ep=episode),
-                           format='hdf5')
-                with open(save_dir + '/parameters.txt', 'w+') as f:
-                    f.write('image index: %d, %d \n' % (image_index, prev_index))
-                    f.write('policy learning rate: %f \n' % policy_lr)
-                    f.write('baseline learning rate: %f \n' % baseline_lr)
-                    f.write('episode length: %d \n' % steps_per_episode)
+                    first_time = False"""
+                state = environment.reset()
+                cum_reward = 0.0
+                terminal = False
+                if not train:
+                    internals = agent.initial_internals()
+                while not terminal:
+                    if train:
+                        action = agent.act(states=dict(features=state['features']))
+                    else:
+                        action, internals = agent.act(states=dict(features=state['features']), internals=internals,
+                                                      independent=True, deterministic=True)
+                    distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
+                    environment.environment.agent_classification = distrib
+                    state, terminal, reward = environment.execute(actions=action)
+                    if train:
+                        agent.observe(terminal=terminal, reward=reward)
+                    cum_reward += reward
+                    if visualize:
+                        print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
+                                                                                 p=class_names[int(np.argmax(distrib))]))
+                        drawer.render(agent=agent_sprite)
+                        agent_sprite.move(environment.environment.agent_pos)
+                sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
+                sys.stdout.flush()
+                episode += 1
+                # Saving model every 1000 episodes
+                if episode % 1000 == 0:
+                    agent.save(directory=save_dir,
+                               filename='agent-{ep}'.format(ep=episode+old_episodes),
+                               format='hdf5')
+                    with open(save_dir + '/parameters.txt', 'w+') as f:
+                        f.write('image index: %d, %d \n' % (image_index, prev_index))
+                        f.write('policy learning rate: %f \n' % policy_lr)
+                        f.write('baseline learning rate: %f \n' % baseline_lr)
+                        f.write('episode length: %d \n' % steps_per_episode)

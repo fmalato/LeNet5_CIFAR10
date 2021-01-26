@@ -17,7 +17,6 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_left = 2
         up_top_right = 3
         up_bottom_right = 4
-        stay = 5
 
     def __init__(self, features, image_class, distribution, max_steps):
         super(DyadicConvnetGymEnv, self).__init__()
@@ -29,7 +28,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.distribution = distribution
         # Ground truth from CIFAR10
         self.image_class = image_class
-        self.ground_truth = [0.91 if i == self.image_class else 0.1 for i in range(10)]
+        self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
         # Will need this for computing the reward
         self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
@@ -74,8 +73,6 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
-        elif action == self.actions.stay:
-            pass
         else:
             assert False, 'unknown action'
 
@@ -93,8 +90,6 @@ class DyadicConvnetGymEnv(gym.Env):
             reward += -10.0
         elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
             reward += -10.0
-        else:
-            reward += 1.0
 
         obs = self.gen_obs()
         # Why {}?
