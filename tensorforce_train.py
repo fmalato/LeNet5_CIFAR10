@@ -142,55 +142,55 @@ if __name__ == '__main__':
             num_layers = 5
             agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
-            while True:
-                # Only one image for now
-                """if not first_time:
-                    # Extraction of a random image for next episode
-                    image_index = random.randint(0, len(train_images) - 1)
-                    train_image = train_images[image_index, :, :, :]
-                    train_label = int(train_labels[image_index])
-                    train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
-                    # Convolutional features extraction
-                    net_features = net.extract_features(train_image_4dim)
-                    net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-                    # Environment reset with new features and distribution
-                    environment.environment.features = net_features
-                    environment.environment.distribution = net_distribution
-                    environment.environment.image_class = train_label
+        while True:
+            # Only one image for now
+            """if not first_time:
+                # Extraction of a random image for next episode
+                image_index = random.randint(0, len(train_images) - 1)
+                train_image = train_images[image_index, :, :, :]
+                train_label = int(train_labels[image_index])
+                train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+                # Convolutional features extraction
+                net_features = net.extract_features(train_image_4dim)
+                net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+                # Environment reset with new features and distribution
+                environment.environment.features = net_features
+                environment.environment.distribution = net_distribution
+                environment.environment.image_class = train_label
+            else:
+                first_time = False"""
+            state = environment.reset()
+            cum_reward = 0.0
+            terminal = False
+            if not train:
+                internals = agent.initial_internals()
+            while not terminal:
+                if train:
+                    action = agent.act(states=dict(features=state['features']))
                 else:
-                    first_time = False"""
-                state = environment.reset()
-                cum_reward = 0.0
-                terminal = False
-                if not train:
-                    internals = agent.initial_internals()
-                while not terminal:
-                    if train:
-                        action = agent.act(states=dict(features=state['features']))
-                    else:
-                        action, internals = agent.act(states=dict(features=state['features']), internals=internals,
-                                                      independent=True, deterministic=False)
-                    distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
-                    environment.environment.agent_classification = distrib
-                    state, terminal, reward = environment.execute(actions=action)
-                    if train:
-                        agent.observe(terminal=terminal, reward=reward)
-                    cum_reward += reward
-                    if visualize:
-                        print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
-                                                                                 p=class_names[int(np.argmax(distrib))]))
-                        drawer.render(agent=agent_sprite)
-                        agent_sprite.move(environment.environment.agent_pos)
-                sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
-                sys.stdout.flush()
-                episode += 1
-                # Saving model every 1000 episodes
-                if episode % 1000 == 0:
-                    agent.save(directory=save_dir,
-                               filename='agent-{ep}'.format(ep=episode+old_episodes),
-                               format='hdf5')
-                    with open(save_dir + '/parameters.txt', 'w+') as f:
-                        f.write('image index: %d \n' % image_index)
-                        f.write('policy learning rate: %f \n' % policy_lr)
-                        f.write('baseline learning rate: %f \n' % baseline_lr)
-                        f.write('episode length: %d \n' % steps_per_episode)
+                    action, internals = agent.act(states=dict(features=state['features']), internals=internals,
+                                                  independent=True, deterministic=False)
+                distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
+                environment.environment.agent_classification = distrib
+                state, terminal, reward = environment.execute(actions=action)
+                if train:
+                    agent.observe(terminal=terminal, reward=reward)
+                cum_reward += reward
+                if visualize:
+                    print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
+                                                                             p=class_names[int(np.argmax(distrib))]))
+                    drawer.render(agent=agent_sprite)
+                    agent_sprite.move(environment.environment.agent_pos)
+            sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
+            sys.stdout.flush()
+            episode += 1
+            # Saving model every 1000 episodes
+            if episode % 1000 == 0:
+                agent.save(directory=save_dir,
+                           filename='agent-{ep}'.format(ep=episode+old_episodes),
+                           format='hdf5')
+                with open(save_dir + '/parameters.txt', 'w+') as f:
+                    f.write('image index: %d \n' % image_index)
+                    f.write('policy learning rate: %f \n' % policy_lr)
+                    f.write('baseline learning rate: %f \n' % baseline_lr)
+                    f.write('episode length: %d \n' % steps_per_episode)
