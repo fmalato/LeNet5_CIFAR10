@@ -21,6 +21,8 @@ if __name__ == '__main__':
         steps_per_episode = 30
         policy_lr = 1e-3
         baseline_lr = 1e-2
+        directory = 'models/RL/20210120-201518/'
+        old_episodes = 19000
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
@@ -56,8 +58,6 @@ if __name__ == '__main__':
                                          max_episode_timesteps=steps_per_episode
                                          )
         # Agent initialization
-        directory = 'models/RL/20210120-201518/'
-        old_episodes = 19000
         print('Loading checkpoint. Last episode: %d' % old_episodes)
         agent = Agent.load(directory=directory,
                            filename='agent-{x}'.format(x=old_episodes),

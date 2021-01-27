@@ -43,27 +43,55 @@ def select_images(num_images, max_range):
 
 def get_actions(filename):
     actions = []
+    probs = []
+    labels = []
+    rewards = []
+    first_actions = []
     with open(filename, 'r') as f:
         for line in f:
             if 'Episode' not in line:
-                if not line.startswith(' 0.'):
-                    action, distribution = (item.strip() for item in line.split(','))
+                if not line.startswith('action'):
+                    action, max_prob, class_label, reward = (item.strip() for item in line.split(','))
                     actions.append(int(action))
+                    probs.append(float(max_prob))
+                    labels.append(int(class_label))
+                    rewards.append(float(reward.rstrip('\n')))
             else:
                 pass
+    for i in range(len(actions)):
+        if i % 30 == 0:
+            first_actions.append(actions[i])
 
-    return actions
+    return actions, probs, labels, rewards, first_actions
 
 
-def plot_actions(actions):
-    fig, ax = plt.subplots(1, 1, figsize=(10, 2))
-    ax.plot(range(len(actions)), actions)
+def plot_stats(actions, probs, labels, rewards, first_actions):
+    fig1, [ax1, ax2] = plt.subplots(2, 1, figsize=(20, 12))
+    fig2, [ax3, ax4, ax5] = plt.subplots(1, 3, figsize=(10, 10))
+    x_ticks = range(len(actions))
+    ax1.plot(x_ticks, probs)
+    ax1.set_title('Probabilities (50 episodes)')
+    ax1.set_xlabel('timestep')
+    ax1.set_ylabel('max probability')
+    ax2.plot(x_ticks, rewards)
+    ax2.set_title('Rewards (50 episodes)')
+    ax2.set_xlabel('timestep')
+    ax2.set_ylabel('reward')
+    ax3.hist(actions, bins=5, range=[0, 4])
+    ax3.set_xlim(0, 4)
+    ax3.set_title('Actions (50 episodes)')
+    ax4.hist(labels, bins=10, range=[0, 9])
+    ax4.set_xlim(0, 9)
+    ax4.set_title('Labels (50 episodes)')
+    ax5.hist(first_actions, bins=5, range=[0, 4])
+    ax5.set_xlim(0, 4)
+    ax5.set_title('First action of the episode (50 episodes)')
     plt.show()
 
 
 def illegal_actions(filename):
     pos = 4
-    actions = get_actions(filename)
+    actions, _, _, _, _ = get_actions(filename)
     illegal_actions = 0
     for a in actions:
         if a == 0:
@@ -78,5 +106,9 @@ def illegal_actions(filename):
             pos = 4
     print('Number of illegal actions: %d / %d' % (illegal_actions, len(actions)))
     print('Probability of illegal action: %f' % (illegal_actions/len(actions)))
-    # TODO: test probability for each checkpoint
 
+
+"""fname = 'models/RL/20210120-201518/stats/stats_agent_2000.txt'
+illegal_actions(fname)
+a, p, l, r, f = get_actions(fname)
+plot_stats(a, p, l, r, f)"""
