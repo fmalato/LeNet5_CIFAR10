@@ -32,10 +32,11 @@ class DyadicConvnetGymEnv(gym.Env):
         # Will need this for computing the reward
         self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
-        self.action_space = spaces.Discrete(len(self.actions))
-        # 64 conv features + 10 categorical distribution from classifier + 3 position
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32),
-                                              #'distribution': spaces.Box(low=0.0, high=1.0, shape=(10,), dtype=np.float32)
+        self.action_space = spaces.Dict({'movement': spaces.Discrete(len(self.actions)),
+                                         'classification': spaces.Discrete(len(self.ground_truth))
+                                         })
+        # 64 conv features + 3 positional coding
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
@@ -46,29 +47,29 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count += 1
         done = False
         reward = 0.0
-        #action = dict(action)
+        action = dict(action)
         old_pos = self.agent_pos
-        if action == self.actions.down:
+        if action['movement'] == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
                                   int(self.agent_pos[2]/2))
-        elif action == self.actions.up_top_left:
+        elif action['movement'] == self.actions.up_top_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2])
-        elif action == self.actions.up_top_right:
+        elif action['movement'] == self.actions.up_top_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2])
-        elif action == self.actions.up_bottom_left:
+        elif action['movement'] == self.actions.up_bottom_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2] + 1)
-        elif action == self.actions.up_bottom_right:
+        elif action['movement'] == self.actions.up_bottom_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
@@ -82,7 +83,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Categorical CrossEntropy between ground truth and classifier
         cross_entropy = self.agent_reward_loss(self.ground_truth, self.agent_classification)
         reward += -tf.keras.backend.get_value(cross_entropy)
-        if self.image_class == np.argmax(self.agent_classification):
+        if self.image_class == action['classification']:
             reward += 10.0
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
@@ -101,8 +102,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count = 0
         self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
         obs = {
-            'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0),
-            #'distribution': self.distribution
+            'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0)
         }
 
         return obs
@@ -110,8 +110,7 @@ class DyadicConvnetGymEnv(gym.Env):
     def gen_obs(self):
         obs = {
             'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]],
-                                        self.agent_pos), axis=0),
-            #'distribution': self.agent_classification
+                                        self.agent_pos), axis=0)
         }
 
         return obs

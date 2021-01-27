@@ -80,10 +80,6 @@ if __name__ == '__main__':
                                dict(type='dense', size=64, activation='relu')
                            ],
                            baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
-                           summarizer=dict(
-                               directory='data/summaries',
-                               summaries='all'
-                           ),
                            learning_rate=policy_lr,
                            batch_size=10,
                            tracking=['tracked_dense'],

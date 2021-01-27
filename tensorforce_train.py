@@ -23,9 +23,9 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
-        load_checkpoint = False
-        train = True
+        visualize = True
+        load_checkpoint = True
+        train = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210112-134853.h5')
@@ -34,8 +34,8 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extraction of a random image
-        image_index = random.randint(0, len(train_images) - 1)
-        #image_index = 1614
+        #image_index = random.randint(0, len(train_images) - 1)
+        image_index = 10720
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -48,22 +48,25 @@ if __name__ == '__main__':
                                           distribution=net_distribution,
                                           max_steps=steps_per_episode
                                           )
-        num_actions = environment.action_space.n
+        num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
                                          states=dict(
                                              # 64 features + 3 positional coding
                                              features=dict(type=float, shape=(67,)),
                                          ),
-                                         actions=dict(type=int, num_values=num_actions),
+                                         actions=dict(
+                                             movement=dict(type=int, num_values=num_actions),
+                                             classification=dict(type=int, num_values=len(class_names))
+                                         ),
                                          max_episode_timesteps=steps_per_episode
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210120-201518/'
+            directory = 'models/RL/20210127-120337/'
             old_episodes = (len(os.listdir(directory)) - 1) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-12000',
+                               filename='agent-6000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -72,9 +75,8 @@ if __name__ == '__main__':
                                    [
                                        dict(type='dense', size=64, activation='relu'),
                                        dict(type='dense', size=64, activation='relu'),
+                                       dict(type='dense', size=64, activation='relu'),
                                        dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                       dict(type=TrackedDense, size=10, activation='softmax'),
-                                       dict(type='dense', size=64, activation='relu')
                                    ],
 
                                ],
@@ -89,13 +91,16 @@ if __name__ == '__main__':
                                ),
                                learning_rate=policy_lr,
                                batch_size=10,
-                               tracking=['tracked_dense'],
+                               tracking=['distribution'],
                                discount=0.99,
                                states=dict(
                                    # 64 features + 3 positional coding
                                    features=dict(type=float, shape=(67,)),
                                ),
-                               actions=dict(type=int, num_values=num_actions),
+                               actions=dict(
+                                   movement=dict(type=int, num_values=num_actions),
+                                   classification=dict(type=int, num_values=len(class_names))
+                               ),
                                entropy_regularization=0.01
                                )
         else:
@@ -107,9 +112,8 @@ if __name__ == '__main__':
                                        [
                                            dict(type='dense', size=64, activation='relu'),
                                            dict(type='dense', size=64, activation='relu'),
-                                           dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                           dict(type=TrackedDense, size=10, activation='softmax'),
-                                           dict(type='dense', size=64, activation='relu')
+                                           dict(type='dense', size=64, activation='relu'),
+                                           dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu')
                                        ],
 
                                    ],
@@ -124,13 +128,16 @@ if __name__ == '__main__':
                                    ),
                                  learning_rate=policy_lr,
                                  batch_size=10,
-                                 tracking=['tracked_dense'],
+                                 tracking=['distribution'],
                                  discount=0.99,
                                  states=dict(
                                        # 64 features + 3 positional coding
                                        features=dict(type=float, shape=(67,)),
                                    ),
-                                 actions=dict(type=int, num_values=num_actions),
+                                 actions=dict(
+                                     movement=dict(type=int, num_values=num_actions),
+                                     classification=dict(type=int, num_values=len(class_names))
+                                 ),
                                  entropy_regularization=0.01
                                  )
         first_time = True
@@ -170,7 +177,7 @@ if __name__ == '__main__':
                 else:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=False)
-                distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
+                distrib = agent.tracked_tensors()['agent/policy/classification_distribution/probabilities']
                 environment.environment.agent_classification = distrib
                 state, terminal, reward = environment.execute(actions=action)
                 if train:
