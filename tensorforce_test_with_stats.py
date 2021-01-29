@@ -1,7 +1,4 @@
-import random
 import sys
-import os
-import datetime
 import numpy as np
 import tensorflow as tf
 from tensorforce.agents import Agent

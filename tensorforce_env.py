@@ -17,6 +17,7 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_left = 2
         up_top_right = 3
         up_bottom_right = 4
+        stay = 5
 
     def __init__(self, features, image_class, distribution, max_steps):
         super(DyadicConvnetGymEnv, self).__init__()
@@ -74,6 +75,8 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
+        elif action['movement'] == self.actions.stay:
+            pass
         else:
             assert False, 'unknown action'
 
@@ -86,11 +89,11 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.image_class == action['classification']:
             reward += 10.0
         # Punishing the agent for illegal actions
-        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+        if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
                                           self.actions.up_top_left, self.actions.up_bottom_left]:
-            reward += -10.0
-        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
-            reward += -10.0
+            reward += -100.0
+        elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
+            reward += -100.0
 
         obs = self.gen_obs()
         # Why {}?

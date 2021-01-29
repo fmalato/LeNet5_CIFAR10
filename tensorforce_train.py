@@ -23,9 +23,9 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
-        load_checkpoint = True
-        train = False
+        visualize = False
+        load_checkpoint = False
+        train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210112-134853.h5')
@@ -34,8 +34,8 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extraction of a random image
-        #image_index = random.randint(0, len(train_images) - 1)
-        image_index = 10720
+        image_index = random.randint(0, len(train_images) - 1)
+        #image_index = 11000
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -62,11 +62,12 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210127-120337/'
-            old_episodes = (len(os.listdir(directory)) - 1) * 1000
+            directory = 'models/RL/20210129-110615/'
+            # -2 because of parameters.txt and summary folder
+            old_episodes = (len(os.listdir(directory)) - 2) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-6000',
+                               filename='agent-5000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',

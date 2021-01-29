@@ -108,7 +108,7 @@ def illegal_actions(filename):
     print('Probability of illegal action: %f' % (illegal_actions/len(actions)))
 
 
-"""fname = 'models/RL/20210120-201518/stats/stats_agent_2000.txt'
+fname = 'models/RL/20210120-201518/stats/stats_agent_15000.txt'
 illegal_actions(fname)
 a, p, l, r, f = get_actions(fname)
-plot_stats(a, p, l, r, f)"""
+plot_stats(a, p, l, r, f)
