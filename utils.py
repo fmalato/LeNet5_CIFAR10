@@ -108,7 +108,19 @@ def illegal_actions(filename):
     print('Probability of illegal action: %f' % (illegal_actions/len(actions)))
 
 
-fname = 'models/RL/20210120-201518/stats/stats_agent_15000.txt'
+def one_image_per_class(labels, num_classes):
+    indexes = []
+    selected = []
+    for i in range(len(labels)):
+        if labels[i] not in selected:
+            selected.append([int(labels[i])])
+            indexes.append(i)
+        if len(indexes) == num_classes:
+            break
+
+    return indexes, selected
+
+"""fname = 'models/RL/20210120-201518/stats/stats_agent_15000.txt'
 illegal_actions(fname)
 a, p, l, r, f = get_actions(fname)
-plot_stats(a, p, l, r, f)
+plot_stats(a, p, l, r, f)"""

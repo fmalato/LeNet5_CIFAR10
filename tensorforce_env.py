@@ -17,7 +17,6 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_left = 2
         up_top_right = 3
         up_bottom_right = 4
-        stay = 5
 
     def __init__(self, features, image_class, distribution, max_steps):
         super(DyadicConvnetGymEnv, self).__init__()
@@ -42,7 +41,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.step_count = 0
         self.agent_pos = None
         self.max_steps = max_steps
-        self.agent_reward_loss = CategoricalCrossentropy(from_logits=True)
+        self.agent_reward_loss = CategoricalCrossentropy()
 
     def step(self, action):
         self.step_count += 1
@@ -75,8 +74,6 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
-        elif action['movement'] == self.actions.stay:
-            pass
         else:
             assert False, 'unknown action'
 
@@ -90,7 +87,7 @@ class DyadicConvnetGymEnv(gym.Env):
             reward += 10.0
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                          self.actions.up_top_left, self.actions.up_bottom_left]:
+                                                      self.actions.up_top_left, self.actions.up_bottom_left]:
             reward += -100.0
         elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
             reward += -100.0

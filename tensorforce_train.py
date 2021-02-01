@@ -12,6 +12,7 @@ from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
 from tracked_dense import TrackedDense
 from grid_drawer import AgentSprite, Drawer
+from utils import one_image_per_class
 
 
 if __name__ == '__main__':
@@ -33,9 +34,13 @@ if __name__ == '__main__':
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
+        # Extracting one image per class
+        indexes, labels = one_image_per_class(test_labels, len(class_names))
+        train_images = np.array([train_images[idx] for idx in indexes])
+        train_labels = np.array(labels)
         # Extraction of a random image
         image_index = random.randint(0, len(train_images) - 1)
-        #image_index = 11000
+        #image_index = 11484
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -62,12 +67,12 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210129-110615/'
+            directory = 'models/RL/20210201-154511/'
             # -2 because of parameters.txt and summary folder
             old_episodes = (len(os.listdir(directory)) - 2) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-5000',
+                               filename='agent-1000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -89,7 +94,7 @@ if __name__ == '__main__':
                                summarizer=dict(
                                    directory='data/summaries',
                                    summaries='all'
-                               ),
+                               ) if train else None,
                                learning_rate=policy_lr,
                                batch_size=10,
                                tracking=['distribution'],
@@ -102,7 +107,8 @@ if __name__ == '__main__':
                                    movement=dict(type=int, num_values=num_actions),
                                    classification=dict(type=int, num_values=len(class_names))
                                ),
-                               entropy_regularization=0.01
+                               entropy_regularization=0.01,
+                               #exploration=0.1
                                )
         else:
             old_episodes = 0
@@ -126,7 +132,7 @@ if __name__ == '__main__':
                                  summarizer=dict(
                                        directory='data/summaries',
                                        summaries='all'
-                                   ),
+                                   ) if train else None,
                                  learning_rate=policy_lr,
                                  batch_size=10,
                                  tracking=['distribution'],
@@ -143,7 +149,10 @@ if __name__ == '__main__':
                                  )
         first_time = True
         episode = 0
-        save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        if load_checkpoint:
+            save_dir = directory
+        else:
+            save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         if visualize:
             # Visualization objects
             tile_width = 10
@@ -152,7 +161,7 @@ if __name__ == '__main__':
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
         while True:
             # Only one image for now
-            """if not first_time:
+            if not first_time:
                 # Extraction of a random image for next episode
                 image_index = random.randint(0, len(train_images) - 1)
                 train_image = train_images[image_index, :, :, :]
@@ -166,7 +175,7 @@ if __name__ == '__main__':
                 environment.environment.distribution = net_distribution
                 environment.environment.image_class = train_label
             else:
-                first_time = False"""
+                first_time = False
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
@@ -185,8 +194,9 @@ if __name__ == '__main__':
                     agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
                 if visualize:
-                    print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
-                                                                             p=class_names[int(np.argmax(distrib))]))
+                    print('Correct label: {l} - Predicted label: {p} - Action: {a}'.format(l=class_names[train_label],
+                                                                             p=class_names[int(np.argmax(distrib))],
+                                                                                           a=action['movement']))
                     drawer.render(agent=agent_sprite)
                     agent_sprite.move(environment.environment.agent_pos)
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
