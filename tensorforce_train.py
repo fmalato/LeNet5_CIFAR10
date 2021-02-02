@@ -25,7 +25,7 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
-        load_checkpoint = False
+        load_checkpoint = True
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -67,12 +67,12 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210201-154511/'
+            directory = 'models/RL/20210201-164508/'
             # -2 because of parameters.txt and summary folder
             old_episodes = (len(os.listdir(directory)) - 2) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-1000',
+                               filename='agent-5000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -163,7 +163,7 @@ if __name__ == '__main__':
             # Only one image for now
             if not first_time:
                 # Extraction of a random image for next episode
-                image_index = random.randint(0, len(train_images) - 1)
+                image_index = episode % len(class_names)
                 train_image = train_images[image_index, :, :, :]
                 train_label = int(train_labels[image_index])
                 train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))

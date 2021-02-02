@@ -84,13 +84,13 @@ class DyadicConvnetGymEnv(gym.Env):
         cross_entropy = self.agent_reward_loss(self.ground_truth, self.agent_classification)
         reward += -tf.keras.backend.get_value(cross_entropy)
         if self.image_class == action['classification']:
-            reward += 10.0
+            reward += 0.1
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
                                                       self.actions.up_top_left, self.actions.up_bottom_left]:
-            reward += -100.0
+            reward += -0.5
         elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
-            reward += -100.0
+            reward += -0.5
 
         obs = self.gen_obs()
         # Why {}?
