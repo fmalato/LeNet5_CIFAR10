@@ -25,7 +25,7 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
-        load_checkpoint = True
+        load_checkpoint = False
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
