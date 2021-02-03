@@ -24,9 +24,9 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
-        load_checkpoint = True
-        train = False
+        visualize = False
+        load_checkpoint = False
+        train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210112-134853.h5')
@@ -108,7 +108,7 @@ if __name__ == '__main__':
                                    classification=dict(type=int, num_values=len(class_names))
                                ),
                                entropy_regularization=0.01,
-                               #exploration=0.1
+                               exploration=0.1
                                )
         else:
             old_episodes = 0
@@ -145,7 +145,8 @@ if __name__ == '__main__':
                                      movement=dict(type=int, num_values=num_actions),
                                      classification=dict(type=int, num_values=len(class_names))
                                  ),
-                                 entropy_regularization=0.01
+                                 entropy_regularization=0.01,
+                                 exploration=0.1
                                  )
         first_time = True
         episode = 0

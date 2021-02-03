@@ -1,6 +1,7 @@
 import time
 import json
 import random
+import ast
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -51,8 +52,8 @@ def get_actions(filename):
         for line in f:
             if 'Episode' not in line:
                 if not line.startswith('action'):
-                    action, max_prob, class_label, reward, _ = (item.strip() for item in line.split(','))
-                    actions.append(list(action))
+                    action, max_prob, class_label, reward, _ = (item.strip() for item in line.split(';'))
+                    actions.append([ast.literal_eval(action)[0], ast.literal_eval(action)[1]])
                     probs.append(float(max_prob))
                     labels.append(int(class_label))
                     rewards.append(float(reward.rstrip('\n')))
@@ -93,8 +94,8 @@ def illegal_actions(filename):
     pos = 4
     actions, _, _, _, _ = get_actions(filename)
     illegal_actions = 0
-    for a in actions:
-        if a == 0:
+    for a, _ in actions:
+        if a[1] == 0:
             pos += 1
         else:
             pos -= 1
@@ -120,7 +121,6 @@ def one_image_per_class(labels, num_classes):
 
     return indexes, selected
 
-fname = 'models/RL/20210202-165314/stats/stats_agent_8000.txt'
+"""fname = 'models/RL/20210202-165314/stats/stats_agent_3000.txt'
 illegal_actions(fname)
-a, p, l, r, f = get_actions(fname)
-plot_stats(a, p, l, r, f)
+a, p, l, r, f = get_actions(fname)"""
