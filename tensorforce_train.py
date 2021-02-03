@@ -24,9 +24,9 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
-        load_checkpoint = False
-        train = True
+        visualize = True
+        load_checkpoint = True
+        train = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210112-134853.h5')
@@ -67,12 +67,12 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210201-164508/'
+            directory = 'models/RL/20210202-150301/'
             # -2 because of parameters.txt and summary folder
             old_episodes = (len(os.listdir(directory)) - 2) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-5000',
+                               filename='agent-10000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -160,7 +160,6 @@ if __name__ == '__main__':
             agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
         while True:
-            # Only one image for now
             if not first_time:
                 # Extraction of a random image for next episode
                 image_index = episode % len(class_names)

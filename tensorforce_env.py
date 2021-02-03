@@ -28,7 +28,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.distribution = distribution
         # Ground truth from CIFAR10
         self.image_class = image_class
-        self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
+        self.ground_truth = [0.91 if i == self.image_class else 0.01 for i in range(10)]
         # Will need this for computing the reward
         self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
@@ -42,11 +42,15 @@ class DyadicConvnetGymEnv(gym.Env):
         self.agent_pos = None
         self.max_steps = max_steps
         self.agent_reward_loss = CategoricalCrossentropy()
+        self.class_reward = 0.0
+        self.mov_reward = 0.0
 
     def step(self, action):
         self.step_count += 1
         done = False
         reward = 0.0
+        self.class_reward = 0.0
+        self.mov_reward = 0.0
         action = dict(action)
         old_pos = self.agent_pos
         if action['movement'] == self.actions.down:
@@ -82,15 +86,16 @@ class DyadicConvnetGymEnv(gym.Env):
 
         # Categorical CrossEntropy between ground truth and classifier
         cross_entropy = self.agent_reward_loss(self.ground_truth, self.agent_classification)
-        reward += -tf.keras.backend.get_value(cross_entropy)
-        if self.image_class == action['classification']:
-            reward += 0.1
+        self.class_reward = -tf.keras.backend.get_value(cross_entropy)
+        """if self.image_class == action['classification']:
+            reward += 0.1"""
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
                                                       self.actions.up_top_left, self.actions.up_bottom_left]:
-            reward += -0.5
+            self.mov_reward = -0.5
         elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
-            reward += -0.5
+            self.mov_reward = -0.5
+        reward = self.class_reward + self.mov_reward
 
         obs = self.gen_obs()
         # Why {}?
@@ -100,7 +105,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Encoded as (layer, x, y)
         self.agent_pos = (4, 0, 0)
         self.step_count = 0
-        self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
+        self.ground_truth = [0.91 if i == self.image_class else 0.01 for i in range(10)]
         obs = {
             'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0)
         }

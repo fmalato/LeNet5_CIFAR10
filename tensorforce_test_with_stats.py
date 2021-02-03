@@ -1,4 +1,5 @@
 import sys
+import random
 import numpy as np
 import tensorflow as tf
 from tensorforce.agents import Agent
@@ -9,6 +10,7 @@ from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
 from tracked_dense import TrackedDense
 from grid_drawer import AgentSprite, Drawer
+from utils import one_image_per_class
 
 
 if __name__ == '__main__':
@@ -18,8 +20,8 @@ if __name__ == '__main__':
         steps_per_episode = 30
         policy_lr = 1e-3
         baseline_lr = 1e-2
-        directory = 'models/RL/20210120-201518/'
-        old_episodes = 19000
+        directory = 'models/RL/20210202-165314/'
+        old_episodes = 8000
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         visualize = False
@@ -30,9 +32,13 @@ if __name__ == '__main__':
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
+        # Extracting one image per class
+        indexes, labels = one_image_per_class(test_labels, len(class_names))
+        train_images = np.array([train_images[idx] for idx in indexes])
+        train_labels = np.array(labels)
         # Extraction of a random image
-        #image_index = random.randint(0, len(train_images) - 1)
-        image_index = 1614
+        image_index = random.randint(0, len(train_images) - 1)
+        #image_index = 1614
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
@@ -45,13 +51,16 @@ if __name__ == '__main__':
                                           distribution=net_distribution,
                                           max_steps=steps_per_episode
                                           )
-        num_actions = environment.action_space.n
+        num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
                                          states=dict(
                                              # 64 features + 3 positional coding
                                              features=dict(type=float, shape=(67,)),
                                          ),
-                                         actions=dict(type=int, num_values=num_actions),
+                                         actions=dict(
+                                             movement=dict(type=int, num_values=num_actions),
+                                             classification=dict(type=int, num_values=len(class_names))
+                                         ),
                                          max_episode_timesteps=steps_per_episode
                                          )
         # Agent initialization
@@ -66,9 +75,8 @@ if __name__ == '__main__':
                                [
                                    dict(type='dense', size=64, activation='relu'),
                                    dict(type='dense', size=64, activation='relu'),
+                                   dict(type='dense', size=64, activation='relu'),
                                    dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                   dict(type=TrackedDense, size=10, activation='softmax'),
-                                   dict(type='dense', size=64, activation='relu')
                                ],
 
                            ],
@@ -79,14 +87,18 @@ if __name__ == '__main__':
                            baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                            learning_rate=policy_lr,
                            batch_size=10,
-                           tracking=['tracked_dense'],
+                           tracking=['distribution'],
                            discount=0.99,
                            states=dict(
                                # 64 features + 3 positional coding
                                features=dict(type=float, shape=(67,)),
                            ),
-                           actions=dict(type=int, num_values=num_actions),
-                           entropy_regularization=0.01
+                           actions=dict(
+                               movement=dict(type=int, num_values=num_actions),
+                               classification=dict(type=int, num_values=len(class_names))
+                           ),
+                           entropy_regularization=0.01,
+                           # exploration=0.1
                            )
         if agent is None:
             print("Couldn't load agent.")
@@ -99,8 +111,23 @@ if __name__ == '__main__':
             agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
             drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
         with open(directory + 'stats_agent_{x}.txt'.format(x=old_episodes), 'w+') as file:
-            file.write('action, max_prob, class_label, reward\n')
+            file.write('action, max_prob, class_label, reward, [class_reward, mov_reward]\n')
             for i in range(50):
+                if not first_time:
+                    # Extraction of a random image for next episode
+                    image_index = episode % len(class_names)
+                    train_image = train_images[image_index, :, :, :]
+                    train_label = int(train_labels[image_index])
+                    train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+                    # Convolutional features extraction
+                    net_features = net.extract_features(train_image_4dim)
+                    net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+                    # Environment reset with new features and distribution
+                    environment.environment.features = net_features
+                    environment.environment.distribution = net_distribution
+                    environment.environment.image_class = train_label
+                else:
+                    first_time = False
                 file.write('Episode %d\n' % i)
                 state = environment.reset()
                 cum_reward = 0.0
@@ -109,12 +136,14 @@ if __name__ == '__main__':
                 while not terminal:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=False)
-                    distrib = agent.tracked_tensors()['agent/policy/network/layer0/tracked_dense']
+                    distrib = agent.tracked_tensors()['agent/policy/classification_distribution/probabilities']
                     environment.environment.agent_classification = distrib
                     state, terminal, reward = environment.execute(actions=action)
+                    reward_components = [environment.environment.class_reward,
+                                         environment.environment.mov_reward]
                     file.write(
-                        '{a},{p},{l},{r}\n'.format(a=action, p=distrib[int(np.argmax(distrib))], l=np.argmax(distrib),
-                                                   r=reward))
+                        '{a},{p},{l},{r},{rl}\n'.format(a=list(action.items()), p=distrib[int(np.argmax(distrib))], l=np.argmax(distrib),
+                                                        r=reward, rl=reward_components))
                     cum_reward += reward
                     if visualize:
                         print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],

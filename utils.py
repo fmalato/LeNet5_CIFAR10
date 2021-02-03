@@ -51,8 +51,8 @@ def get_actions(filename):
         for line in f:
             if 'Episode' not in line:
                 if not line.startswith('action'):
-                    action, max_prob, class_label, reward = (item.strip() for item in line.split(','))
-                    actions.append(int(action))
+                    action, max_prob, class_label, reward, _ = (item.strip() for item in line.split(','))
+                    actions.append(list(action))
                     probs.append(float(max_prob))
                     labels.append(int(class_label))
                     rewards.append(float(reward.rstrip('\n')))
@@ -120,7 +120,7 @@ def one_image_per_class(labels, num_classes):
 
     return indexes, selected
 
-"""fname = 'models/RL/20210120-201518/stats/stats_agent_15000.txt'
+fname = 'models/RL/20210202-165314/stats/stats_agent_8000.txt'
 illegal_actions(fname)
 a, p, l, r, f = get_actions(fname)
-plot_stats(a, p, l, r, f)"""
+plot_stats(a, p, l, r, f)
