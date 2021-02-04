@@ -24,12 +24,12 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
+        visualize = True
         load_checkpoint = False
-        train = True
+        train = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
-        net.load_weights('models/model_CIFAR10/20210112-134853.h5')
+        net.load_weights('models/model_CIFAR10/20210204-114442.h5')
         #net.summary()
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
@@ -38,15 +38,21 @@ if __name__ == '__main__':
         indexes, labels = one_image_per_class(test_labels, len(class_names))
         train_images = np.array([train_images[idx] for idx in indexes])
         train_labels = np.array(labels)
-        # Extraction of a random image
-        image_index = random.randint(0, len(train_images) - 1)
-        #image_index = 11484
+        # Extraction of a random image - For now extraction of first image
+        image_index = 0
         train_image = train_images[image_index, :, :, :]
         train_label = int(train_labels[image_index])
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
         # Convolutional features extraction
         net_features = net.extract_features(train_image_4dim)
+        for idx in range(10):
+            train_image = train_images[idx, :, :, :]
+            train_label = int(train_labels[idx])
+            train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
+            net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+            print(net_distribution)
         net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
+        print(net_distribution)
         # Environment initialization
         environment = DyadicConvnetGymEnv(features=net_features,
                                           image_class=train_label,
@@ -67,12 +73,12 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210202-150301/'
+            directory = 'models/RL/20210203-200716/'
             # -2 because of parameters.txt and summary folder
             old_episodes = (len(os.listdir(directory)) - 2) * 1000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-10000',
+                               filename='agent-1000',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',

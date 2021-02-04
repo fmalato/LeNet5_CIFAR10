@@ -10,7 +10,7 @@ from tensorforce_net import DyadicConvNet
 if __name__ == '__main__':
     # Parameters initialization
     num_epochs = 20
-    batch_size = 128
+    batch_size = 64
     dataset_name = 'CIFAR10'
     # Network initialization
     net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # Training
     with tf.device('/device:GPU:0'):
         net.compile(optimizer='adam',
-                    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                     metrics=['accuracy'])
 
         history = net.fit(train_images, train_labels, epochs=num_epochs,
