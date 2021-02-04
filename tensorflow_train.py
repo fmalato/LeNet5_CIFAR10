@@ -6,18 +6,22 @@ import matplotlib.pyplot as plt
 from tensorflow.keras import datasets
 from tensorforce_net import DyadicConvNet
 
+from sklearn.model_selection import train_test_split
+
 
 if __name__ == '__main__':
     # Parameters initialization
     num_epochs = 20
-    batch_size = 64
+    batch_size = 1
     dataset_name = 'CIFAR10'
     # Network initialization
     net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
     net.summary()
     # Dataset initialization
     (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+    train_images, val_images, train_labels, val_labels = train_test_split(train_images, train_labels, test_size=0.1)
     train_images, test_images = train_images / 255.0, test_images / 255.0
+    val_images = val_images / 255.0
     class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                    'dog', 'frog', 'horse', 'ship', 'truck']
     # Training
@@ -27,7 +31,7 @@ if __name__ == '__main__':
                     metrics=['accuracy'])
 
         history = net.fit(train_images, train_labels, epochs=num_epochs,
-                          validation_data=(test_images, test_labels))
+                          validation_data=(val_images, val_labels))
         # Plotting accuracy
         plt.plot(history.history['accuracy'], label='accuracy')
         plt.plot(history.history['val_accuracy'], label='val_accuracy')

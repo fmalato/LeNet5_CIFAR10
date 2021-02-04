@@ -50,9 +50,8 @@ if __name__ == '__main__':
             train_label = int(train_labels[idx])
             train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
             net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-            print(net_distribution)
+            print(np.argmax(net_distribution), np.max(net_distribution), train_label)
         net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-        print(net_distribution)
         # Environment initialization
         environment = DyadicConvnetGymEnv(features=net_features,
                                           image_class=train_label,
