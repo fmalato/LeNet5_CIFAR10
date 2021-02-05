@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 if __name__ == '__main__':
     # Parameters initialization
-    num_epochs = 20
+    num_epochs = 10
     batch_size = 1
     dataset_name = 'CIFAR10'
     # Network initialization

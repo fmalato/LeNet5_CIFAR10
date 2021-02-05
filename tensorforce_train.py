@@ -24,18 +24,18 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = True
+        visualize = False
         load_checkpoint = False
-        train = False
+        train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
-        net.load_weights('models/model_CIFAR10/20210204-114442.h5')
+        net.load_weights('models/model_CIFAR10/20210204-122725.h5')
         #net.summary()
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extracting one image per class
-        indexes, labels = one_image_per_class(test_labels, len(class_names))
+        indexes, labels = one_image_per_class(train_labels, len(class_names))
         train_images = np.array([train_images[idx] for idx in indexes])
         train_labels = np.array(labels)
         # Extraction of a random image - For now extraction of first image

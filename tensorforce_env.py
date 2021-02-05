@@ -28,7 +28,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.distribution = distribution
         # Ground truth from CIFAR10
         self.image_class = image_class
-        self.ground_truth = [0.91 if i == self.image_class else 0.01 for i in range(10)]
+        self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
         # Will need this for computing the reward
         self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
@@ -105,7 +105,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Encoded as (layer, x, y)
         self.agent_pos = (4, 0, 0)
         self.step_count = 0
-        self.ground_truth = [0.91 if i == self.image_class else 0.01 for i in range(10)]
+        self.ground_truth = [1.0 if i == self.image_class else 0.0 for i in range(10)]
         obs = {
             'features': np.concatenate((self.features[0][0][0], self.agent_pos), axis=0)
         }
