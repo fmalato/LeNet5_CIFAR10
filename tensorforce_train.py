@@ -24,9 +24,11 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        visualize = False
-        load_checkpoint = False
-        train = True
+        # 2.0 kills the learning, 0.5 doesn't seem to affect it at all.
+        e_r = 0.01
+        visualize = True
+        load_checkpoint = True
+        train = False
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210204-122725.h5')
@@ -45,12 +47,6 @@ if __name__ == '__main__':
         train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
         # Convolutional features extraction
         net_features = net.extract_features(train_image_4dim)
-        for idx in range(10):
-            train_image = train_images[idx, :, :, :]
-            train_label = int(train_labels[idx])
-            train_image_4dim = np.reshape(train_image, (batch_size, 32, 32, 3))
-            net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
-            print(np.argmax(net_distribution), np.max(net_distribution), train_label)
         net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
         # Environment initialization
         environment = DyadicConvnetGymEnv(features=net_features,
@@ -72,28 +68,23 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210203-200716/'
+            directory = 'models/RL/20210208-130142/'
             # -2 because of parameters.txt and summary folder
-            old_episodes = (len(os.listdir(directory)) - 2) * 1000
+            old_episodes = 3000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
-                               filename='agent-1000',
+                               filename='agent-{x}'.format(x=old_episodes),
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
                                network=[
-                                   # First module: shared dense block
-                                   [
                                        dict(type='dense', size=64, activation='relu'),
                                        dict(type='dense', size=64, activation='relu'),
-                                       dict(type='dense', size=64, activation='relu'),
-                                       dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu'),
-                                   ],
-
+                                       dict(type='lstm', size=64, horizon=20, activation='relu'),
                                ],
                                baseline=[
                                    dict(type='dense', size=64, activation='relu'),
-                                   dict(type='dense', size=64, activation='relu')
+                                   dict(type='dense', size=64, activation='relu'),
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                summarizer=dict(
@@ -109,31 +100,25 @@ if __name__ == '__main__':
                                    features=dict(type=float, shape=(67,)),
                                ),
                                actions=dict(
-                                   movement=dict(type=int, num_values=num_actions),
-                                   classification=dict(type=int, num_values=len(class_names))
+                                   classification=dict(type=int, num_values=len(class_names)),
+                                   movement=dict(type=int, num_values=num_actions)
                                ),
-                               entropy_regularization=0.01,
-                               exploration=0.1
+                               entropy_regularization=e_r
                                )
         else:
             old_episodes = 0
             agent = Agent.create(environment=environment,
                                  agent='ppo',
                                  network=[
-                                       # First module: shared dense block
-                                       [
-                                           dict(type='dense', size=64, activation='relu'),
-                                           dict(type='dense', size=64, activation='relu'),
-                                           dict(type='dense', size=64, activation='relu'),
-                                           dict(type='lstm', size=64, horizon=steps_per_episode, activation='relu')
-                                       ],
-
-                                   ],
+                                     dict(type='dense', size=64, activation='relu'),
+                                     dict(type='dense', size=64, activation='relu'),
+                                     dict(type='lstm', size=64, horizon=20, activation='relu'),
+                                 ],
                                  baseline=[
                                      dict(type='dense', size=64, activation='relu'),
                                      dict(type='dense', size=64, activation='relu')
                                  ],
-                                 baseline_optimizer=dict(optimizer='adam', learning_rate=1e-3),
+                                 baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                  summarizer=dict(
                                        directory='data/summaries',
                                        summaries='all'
@@ -147,11 +132,10 @@ if __name__ == '__main__':
                                        features=dict(type=float, shape=(67,)),
                                    ),
                                  actions=dict(
-                                     movement=dict(type=int, num_values=num_actions),
-                                     classification=dict(type=int, num_values=len(class_names))
+                                     classification=dict(type=int, num_values=len(class_names)),
+                                     movement=dict(type=int, num_values=num_actions)
                                  ),
-                                 entropy_regularization=0.01,
-                                 exploration=0.1
+                                 entropy_regularization=e_r
                                  )
         first_time = True
         episode = 0
