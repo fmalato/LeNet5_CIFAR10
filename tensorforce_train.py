@@ -26,9 +26,9 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # 2.0 kills the learning, 0.5 doesn't seem to affect it at all.
         e_r = 0.01
-        visualize = True
+        visualize = False
         load_checkpoint = True
-        train = False
+        train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210204-122725.h5')
@@ -68,9 +68,8 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210208-130142/'
-            # -2 because of parameters.txt and summary folder
-            old_episodes = 3000
+            directory = 'models/RL/20210208-135953/'
+            old_episodes = 28000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),

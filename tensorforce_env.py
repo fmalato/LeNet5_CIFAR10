@@ -94,15 +94,19 @@ class DyadicConvnetGymEnv(gym.Env):
         elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
             self.mov_reward = -0.5"""
 
+        # Confidence in predicted class
         gamma = self.agent_classification[action['classification']]
-        c_1 = 1.0 if action['classification'] == self.image_class else -1.0
+        c_1 = 2.0 if action['classification'] == self.image_class else -2.0
+        # Confidence in correct class at timestep t - same at timestep (t-1)
         delta = self.agent_classification[self.image_class] - self.right_old_class
-        c_2 = 0.5
+        c_2 = 0.3
+        # Illegal move
         if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
                                                       self.actions.up_top_left, self.actions.up_bottom_left]:
             c_3 = -0.3
         elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
             c_3 = -0.3
+        # Legal move - Maybe this can be avioded
         else:
             c_3 = 0.3
 
