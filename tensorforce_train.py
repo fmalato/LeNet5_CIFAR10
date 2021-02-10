@@ -19,15 +19,14 @@ if __name__ == '__main__':
     with tf.device('/device:CPU:0'):
         # Parameters initialization
         batch_size = 1
-        steps_per_episode = 30
+        steps_per_episode = 1
         policy_lr = 1e-3
         baseline_lr = 1e-2
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
-        # 2.0 kills the learning, 0.5 doesn't seem to affect it at all.
-        e_r = 0.01
+        e_r = 0.05
         visualize = False
-        load_checkpoint = True
+        load_checkpoint = False
         train = True
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -58,18 +57,17 @@ if __name__ == '__main__':
         environment = Environment.create(environment=environment,
                                          states=dict(
                                              # 64 features + 3 positional coding
-                                             features=dict(type=float, shape=(67,)),
+                                             features=dict(type=float, shape=(64,)),
                                          ),
                                          actions=dict(
-                                             movement=dict(type=int, num_values=num_actions),
                                              classification=dict(type=int, num_values=len(class_names))
                                          ),
                                          max_episode_timesteps=steps_per_episode
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210208-135953/'
-            old_episodes = 28000
+            directory = 'models/RL/20210209-111540/'
+            old_episodes = 75000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -78,12 +76,9 @@ if __name__ == '__main__':
                                agent='ppo',
                                network=[
                                        dict(type='dense', size=64, activation='relu'),
-                                       dict(type='dense', size=64, activation='relu'),
-                                       dict(type='lstm', size=64, horizon=20, activation='relu'),
                                ],
                                baseline=[
-                                   dict(type='dense', size=64, activation='relu'),
-                                   dict(type='dense', size=64, activation='relu'),
+                                   dict(type='dense', size=64, activation='relu')
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                summarizer=dict(
@@ -96,11 +91,10 @@ if __name__ == '__main__':
                                discount=0.99,
                                states=dict(
                                    # 64 features + 3 positional coding
-                                   features=dict(type=float, shape=(67,)),
+                                   features=dict(type=float, shape=(64,)),
                                ),
                                actions=dict(
                                    classification=dict(type=int, num_values=len(class_names)),
-                                   movement=dict(type=int, num_values=num_actions)
                                ),
                                entropy_regularization=e_r
                                )
@@ -110,11 +104,8 @@ if __name__ == '__main__':
                                  agent='ppo',
                                  network=[
                                      dict(type='dense', size=64, activation='relu'),
-                                     dict(type='dense', size=64, activation='relu'),
-                                     dict(type='lstm', size=64, horizon=20, activation='relu'),
                                  ],
                                  baseline=[
-                                     dict(type='dense', size=64, activation='relu'),
                                      dict(type='dense', size=64, activation='relu')
                                  ],
                                  baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
@@ -128,11 +119,10 @@ if __name__ == '__main__':
                                  discount=0.99,
                                  states=dict(
                                        # 64 features + 3 positional coding
-                                       features=dict(type=float, shape=(67,)),
+                                       features=dict(type=float, shape=(64,)),
                                    ),
                                  actions=dict(
                                      classification=dict(type=int, num_values=len(class_names)),
-                                     movement=dict(type=int, num_values=num_actions)
                                  ),
                                  entropy_regularization=e_r
                                  )
