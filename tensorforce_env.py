@@ -129,12 +129,10 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def reset(self):
         # Encoded as (layer, x, y)
-        # TODO: Check position
         starting_layer = np.random.randint(0, len(self.features) - 1)
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
-        print('reset: {x}'.format(x=self.agent_pos))
         self.step_count = 0
         self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
 
