@@ -120,7 +120,7 @@ class Drawer:
         self.ax[agent.position[0]].add_patch(agent.draw(first_step))
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
-        plt.pause(0.2)
+        plt.pause(1.0 if first_step else 0.2)
 
     def render_grid(self, key):
         img = np.zeros((key * self.tile_width + 1, key * self.tile_width + 1, 3))
@@ -139,17 +139,3 @@ class Drawer:
         tile[:, :, 1].fill(0.25)
         tile[:, :, 2].fill(1.0)
         return tile
-
-
-"""agent = AgentSprite(rect_width=10, num_layers=5)
-drawer = Drawer(agent, num_layers=5, tile_width=10)
-num_layers = 5
-max_tiles = pow(2, num_layers - 1)
-for k in range(100):
-    start = time.time()
-    drawer.render()
-    next_pos = random.sample(agent.neighborhood, k=1)
-    agent.move(next_pos[0])
-    end = time.time()
-    sys.stdout.write('\r{pos} - Rendering time: {t}'.format(pos=next_pos[0], t=end - start))
-    sys.stdout.flush()"""
