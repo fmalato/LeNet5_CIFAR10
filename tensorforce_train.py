@@ -3,6 +3,7 @@ import sys
 import getopt
 import datetime
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorforce.agents import Agent
 from tensorforce.environments import Environment
@@ -50,6 +51,7 @@ if __name__ == '__main__':
         net_distribution = np.reshape(net(train_image_4dim).numpy(), (10,))
         # Environment initialization
         environment = DyadicConvnetGymEnv(features=net_features,
+                                          train_image=train_image,
                                           image_class=train_label,
                                           distribution=net_distribution,
                                           max_steps=steps_per_episode,
@@ -70,7 +72,7 @@ if __name__ == '__main__':
         # Agent initialization
         if load_checkpoint:
             directory = 'models/RL/20210211-122820/'
-            old_episodes = 9000
+            old_episodes = 18000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -100,8 +102,7 @@ if __name__ == '__main__':
                                    classification=dict(type=int, num_values=len(class_names)),
                                    movement=dict(type=int, num_values=num_actions)
                                ),
-                               entropy_regularization=e_r,
-                               exploration=0.1 if train else 0.0
+                               entropy_regularization=e_r
                                )
         else:
             old_episodes = 0
@@ -154,6 +155,7 @@ if __name__ == '__main__':
                 environment.environment.features = net_features
                 environment.environment.distribution = net_distribution
                 environment.environment.image_class = train_label
+                environment.environment.train_image = train_image
             else:
                 first_time = False
             state = environment.reset()
@@ -174,10 +176,10 @@ if __name__ == '__main__':
                 if train:
                     agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
-                if visualize:
+                """if visualize:
                     print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
                                                                              p=class_names[int(np.argmax(distrib))],
-                                                                             ))
+                                                                             ))"""
                 first_step = False
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
             sys.stdout.flush()

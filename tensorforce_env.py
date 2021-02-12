@@ -19,7 +19,7 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 3
         up_bottom_right = 4
 
-    def __init__(self, features, image_class, distribution, max_steps, visualize=False, tile_width=10):
+    def __init__(self, features, train_image, image_class, distribution, max_steps, visualize=False, tile_width=10):
         super(DyadicConvnetGymEnv, self).__init__()
         assert type(features) == dict, "parameter 'features' must be a dict"
         assert type(distribution) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
@@ -28,6 +28,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # CNN distribution over selected image
         self.distribution = distribution
         # Ground truth from CIFAR10
+        self.train_image = train_image
         self.image_class = image_class
         self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
         # Will need this for computing the reward
@@ -87,7 +88,8 @@ class DyadicConvnetGymEnv(gym.Env):
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
-            self.drawer.render(agent=self.agent_sprite, first_step=False)
+            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=self.image_class,
+                               predicted=action['classification'], first_step=False)
         if self.step_count >= self.max_steps:
             done = True
 
@@ -141,7 +143,8 @@ class DyadicConvnetGymEnv(gym.Env):
         }
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
-            self.drawer.render(agent=self.agent_sprite, first_step=True)
+            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=self.image_class,
+                               predicted=np.argmax(self.agent_classification), first_step=True)
         """obs_feats = []
         for i in range(self.agent_pos[1] - 1, self.agent_pos[1] + 2):
             for j in range(self.agent_pos[2] - 1, self.agent_pos[2] + 2):

@@ -68,11 +68,14 @@ class Drawer:
 
     def __init__(self, agent, num_layers, tile_width):
         self.agent = agent
+        # TODO: find a more general way
+        self.class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                            'dog', 'frog', 'horse', 'ship', 'truck']
         # Knowing that it's a dyadic decomposition, there's no need to specify the shape of every layer
         self.num_layers = num_layers
         self.grids = {}
         self.tile_width = tile_width
-        self.fig, self.ax = plt.subplots(1, self.num_layers, figsize=(10, 4), gridspec_kw={'width_ratios': [4, 2, 1, 0.5, 0.25]})
+        self.fig, self.ax = plt.subplots(1, self.num_layers + 1, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 2, 1, 0.5, 0.25, 2]})
         # Show the env name in the window title
         self.fig.canvas.set_window_title('Dyadic conv')
         self.fig.canvas.draw_idle()
@@ -87,6 +90,9 @@ class Drawer:
             img = self.render_grid(key=key)
             self.ax[index].imshow(img)
             index += 1
+        self.current_image = self.ax[self.num_layers].imshow(img)
+        self.correct_label = self.ax[self.num_layers].text(0, 19, '', fontsize=12)
+        self.predicted_label = self.ax[self.num_layers - 1].text(7, 140, '', fontsize=12)
         self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.ax]
 
         # Turn off x/y axis numbering/ticks
@@ -108,7 +114,7 @@ class Drawer:
         }
         plt.show(block=False)
 
-    def render(self, agent, first_step=False):
+    def render(self, agent, img, label, predicted, first_step=False):
         for i in range(self.num_layers):
             self.ax[i].patches = []
         for pos in agent.neighborhood:
@@ -118,6 +124,9 @@ class Drawer:
         for bg in self.backgrounds:
             self.fig.canvas.restore_region(bg)
         self.ax[agent.position[0]].add_patch(agent.draw(first_step))
+        self.current_image.set_data(img)
+        self.correct_label.set_text('Class: {x}'.format(x=self.class_names[label]))
+        self.predicted_label.set_text('Predicted: {x}'.format(x=self.class_names[predicted]))
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
         plt.pause(1.0 if first_step else 0.2)
