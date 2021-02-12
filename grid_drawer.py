@@ -34,11 +34,18 @@ class Grid:
 
 class AgentSprite:
 
-    def __init__(self, rect_width, num_layers):
-        self.position = (4, 0, 0)
+    def __init__(self, rect_width, num_layers, pos):
+        self.position = pos
         self.rect_width = rect_width
         self.num_layers = num_layers
-        self.neighborhood = [(3, 0, 0), (3, 0, 1), (3, 1, 0), (3, 1, 1)]
+        self.neighborhood = []
+        if self.position[0] < self.num_layers - 1:
+            self.neighborhood.append((self.position[0] + 1, int(self.position[1] / 2), int(self.position[2] / 2)))
+        if self.position[0] > 0:
+            self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2]))
+            self.neighborhood.append((self.position[0] - 1, 2 * self.position[1] + 1, 2 * self.position[2]))
+            self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2] + 1))
+            self.neighborhood.append((self.position[0] - 1, 2 * self.position[1] + 1, 2 * self.position[2] + 1))
 
     def move(self, position):
         self.position = position
@@ -51,10 +58,10 @@ class AgentSprite:
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2] + 1))
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1] + 1, 2 * self.position[2] + 1))
 
-    def draw(self):
+    def draw(self, first_step):
         return patches.Circle(xy=(self.position[1]*self.rect_width + int(self.rect_width/2),
                                   self.position[2]*self.rect_width + int(self.rect_width/2)),
-                              radius=int(self.rect_width/2) - 1, color='r')
+                              radius=int(self.rect_width/2) - 1, color='g' if first_step else 'r')
 
 
 class Drawer:
@@ -101,7 +108,7 @@ class Drawer:
         }
         plt.show(block=False)
 
-    def render(self, agent):
+    def render(self, agent, first_step=False):
         for i in range(self.num_layers):
             self.ax[i].patches = []
         for pos in agent.neighborhood:
@@ -110,10 +117,9 @@ class Drawer:
                                                         color=(0.25, 0.25, 1.0)))
         for bg in self.backgrounds:
             self.fig.canvas.restore_region(bg)
-        self.ax[agent.position[0]].add_patch(agent.draw())
+        self.ax[agent.position[0]].add_patch(agent.draw(first_step))
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
-
         plt.pause(0.2)
 
     def render_grid(self, key):

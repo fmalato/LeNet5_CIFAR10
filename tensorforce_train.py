@@ -52,7 +52,8 @@ if __name__ == '__main__':
         environment = DyadicConvnetGymEnv(features=net_features,
                                           image_class=train_label,
                                           distribution=net_distribution,
-                                          max_steps=steps_per_episode
+                                          max_steps=steps_per_episode,
+                                          visualize=visualize
                                           )
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
@@ -68,7 +69,7 @@ if __name__ == '__main__':
                                          )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210211-112337/'
+            directory = 'models/RL/20210211-122820/'
             old_episodes = 9000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
@@ -137,13 +138,8 @@ if __name__ == '__main__':
             save_dir = directory
         else:
             save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        if visualize:
-            # Visualization objects
-            tile_width = 10
-            num_layers = 5
-            agent_sprite = AgentSprite(rect_width=tile_width, num_layers=num_layers)
-            drawer = Drawer(agent_sprite, num_layers=num_layers, tile_width=tile_width)
-        while True:
+        # Train/test loop
+        while episode <= 9000:
             if not first_time:
                 # Extraction of a random image for next episode
                 # image_index = episode % len(class_names)
@@ -163,6 +159,7 @@ if __name__ == '__main__':
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
+            first_step = True
             if not train:
                 internals = agent.initial_internals()
             while not terminal:
@@ -180,9 +177,8 @@ if __name__ == '__main__':
                 if visualize:
                     print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
                                                                              p=class_names[int(np.argmax(distrib))],
-                                                                                           ))
-                    drawer.render(agent=agent_sprite)
-                    agent_sprite.move(environment.environment.agent_pos)
+                                                                             ))
+                first_step = False
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
             sys.stdout.flush()
             episode += 1
