@@ -2,6 +2,7 @@ import time
 import json
 import random
 import ast
+from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -121,6 +122,18 @@ def one_image_per_class(labels, num_classes):
 
     return indexes, selected
 
-"""fname = 'models/RL/20210202-165314/stats/stats_agent_3000.txt'
-illegal_actions(fname)
-a, p, l, r, f = get_actions(fname)"""
+
+def n_images_per_class(n, labels, num_classes):
+    indexes = []
+    ordered_labels = []
+    for j in range(n):
+        selected = []
+        i = np.max(indexes)+1 if len(indexes) > 0 else 0
+        while len(selected) < num_classes:
+            if labels[i] not in selected:
+                selected.append([int(labels[i])])
+                ordered_labels.append([int(labels[i])])
+                indexes.append(i)
+            i += 1
+
+    return indexes, ordered_labels

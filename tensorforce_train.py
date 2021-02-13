@@ -1,9 +1,8 @@
 import random
 import sys
-import getopt
 import datetime
+
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorforce.agents import Agent
 from tensorforce.environments import Environment
@@ -11,9 +10,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from tracked_dense import TrackedDense
-from grid_drawer import AgentSprite, Drawer
-from utils import one_image_per_class
+from utils import one_image_per_class, n_images_per_class
 
 
 if __name__ == '__main__':
@@ -32,12 +29,11 @@ if __name__ == '__main__':
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210204-122725.h5')
-        #net.summary()
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         # Extracting one image per class
-        indexes, labels = one_image_per_class(train_labels, len(class_names))
+        indexes, labels = n_images_per_class(n=2, labels=train_labels, num_classes=len(class_names))
         train_images = np.array([train_images[idx] for idx in indexes])
         train_labels = np.array(labels)
         # Extraction of a random image - For now extraction of first image
@@ -60,7 +56,6 @@ if __name__ == '__main__':
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             # 64 features + 3 positional coding
                                              features=dict(type=float, shape=(64,)),
                                          ),
                                          actions=dict(
@@ -72,7 +67,7 @@ if __name__ == '__main__':
         # Agent initialization
         if load_checkpoint:
             directory = 'models/RL/20210211-122820/'
-            old_episodes = 18000
+            old_episodes = 9000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -86,6 +81,7 @@ if __name__ == '__main__':
                                    dict(type='dense', size=64, activation='relu')
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
+                               # Tensorboard initialized only if training
                                summarizer=dict(
                                    directory='data/summaries',
                                    summaries='all'
@@ -95,7 +91,6 @@ if __name__ == '__main__':
                                tracking=['distribution'],
                                discount=0.99,
                                states=dict(
-                                   # 64 features + 3 positional coding
                                    features=dict(type=float, shape=(64,)),
                                ),
                                actions=dict(
@@ -115,6 +110,7 @@ if __name__ == '__main__':
                                      dict(type='dense', size=64, activation='relu')
                                  ],
                                  baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
+                                 # Tensorboard initialized only if training
                                  summarizer=dict(
                                        directory='data/summaries',
                                        summaries='all'
@@ -124,7 +120,6 @@ if __name__ == '__main__':
                                  tracking=['distribution'],
                                  discount=0.99,
                                  states=dict(
-                                     # 64 features + 3 positional coding
                                      features=dict(type=float, shape=(64,)),
                                  ),
                                  actions=dict(
@@ -133,8 +128,10 @@ if __name__ == '__main__':
                                  ),
                                  entropy_regularization=e_r
                                  )
+        # Parameters for training loop
         first_time = True
         episode = 0
+        # Where to store checkpoints
         if load_checkpoint:
             save_dir = directory
         else:
@@ -164,6 +161,7 @@ if __name__ == '__main__':
             first_step = True
             if not train:
                 internals = agent.initial_internals()
+            # Episode loop
             while not terminal:
                 if train:
                     action = agent.act(states=dict(features=state['features']))
@@ -181,6 +179,7 @@ if __name__ == '__main__':
                                                                              p=class_names[int(np.argmax(distrib))],
                                                                              ))"""
                 first_step = False
+            # Stats for current episode
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
             sys.stdout.flush()
             episode += 1
@@ -190,7 +189,7 @@ if __name__ == '__main__':
                            filename='agent-{ep}'.format(ep=episode+old_episodes),
                            format='hdf5')
                 with open(save_dir + '/parameters.txt', 'w+') as f:
-                    f.write('image index: %d \n' % image_index)
+                    f.write('entropy regularization: %d \n' % e_r)
                     f.write('policy learning rate: %f \n' % policy_lr)
                     f.write('baseline learning rate: %f \n' % baseline_lr)
                     f.write('episode length: %d \n' % steps_per_episode)

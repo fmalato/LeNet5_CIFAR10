@@ -37,7 +37,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })
-        # 64 conv features + 3 positional coding
+        # 64 conv features
         self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(64,), dtype=np.float32)
                                               })
         self.step_count = 0
@@ -144,7 +144,7 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=self.image_class,
-                               predicted=np.argmax(self.agent_classification), first_step=True)
+                               predicted=np.argmax(self.distribution), first_step=True)
         """obs_feats = []
         for i in range(self.agent_pos[1] - 1, self.agent_pos[1] + 2):
             for j in range(self.agent_pos[2] - 1, self.agent_pos[2] + 2):
@@ -154,7 +154,7 @@ class DyadicConvnetGymEnv(gym.Env):
                 else:
                     obs_feats.append(np.zeros((64,)))
         obs = {
-            'features': np.concatenate((np.concatenate(obs_feats, axis=0), self.agent_pos), axis=0)
+            'features': np.concatenate(obs_feats, axis=0)
         }"""
 
         return obs
@@ -172,7 +172,7 @@ class DyadicConvnetGymEnv(gym.Env):
                 else:
                     obs_feats.append(np.zeros((64,)))
         obs = {
-            'features': np.concatenate((np.concatenate(obs_feats, axis=0), self.agent_pos), axis=0)
+            'features': np.concatenate(obs_feats, axis=0)
         }"""
 
         return obs
