@@ -174,10 +174,6 @@ if __name__ == '__main__':
                 if train:
                     agent.observe(terminal=terminal, reward=reward)
                 cum_reward += reward
-                """if visualize:
-                    print('Correct label: {l} - Predicted label: {p}'.format(l=class_names[train_label],
-                                                                             p=class_names[int(np.argmax(distrib))],
-                                                                             ))"""
                 first_step = False
             # Stats for current episode
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))

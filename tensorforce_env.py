@@ -34,6 +34,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Will need this for computing the reward
         self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
+        # Double action space
         self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })
