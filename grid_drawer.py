@@ -126,10 +126,13 @@ class Drawer:
         self.ax[agent.position[0]].add_patch(agent.draw(first_step))
         self.current_image.set_data(img)
         self.correct_label.set_text('Class: {x}'.format(x=self.class_names[label]))
-        self.predicted_label.set_text('Predicted: {x}'.format(x=self.class_names[predicted]))
+        if predicted is not None:
+            self.predicted_label.set_text('Predicted: {x}'.format(x=self.class_names[predicted]))
+        else:
+            self.predicted_label.set_text('Predicted: None')
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
-        plt.pause(1.0 if first_step else 0.2)
+        plt.pause(1.0 if first_step or (predicted is not None) else 0.2)
 
     def render_grid(self, key):
         img = np.zeros((key * self.tile_width + 1, key * self.tile_width + 1, 3))

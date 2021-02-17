@@ -13,33 +13,39 @@ class DyadicConvnetGymEnv(gym.Env):
     metadata = {'render-modes': ['human']}
 
     class Actions(IntEnum):
-        down = 0
-        up_top_left = 1
-        up_bottom_left = 2
-        up_top_right = 3
-        up_bottom_right = 4
+        down = 10
+        up_top_left = 11
+        up_bottom_left = 12
+        up_top_right = 13
+        up_bottom_right = 14
+        stay = 15
 
-    def __init__(self, features, train_image, image_class, distribution, max_steps, visualize=False, tile_width=10):
+    def __init__(self, network, dataset, labels, max_steps, visualize=False, tile_width=10, num_layers=5):
         super(DyadicConvnetGymEnv, self).__init__()
-        assert type(features) == dict, "parameter 'features' must be a dict"
-        assert type(distribution) == np.ndarray, "parameter 'distribution' must be a numpy ndarray"
-        # CNN representation of the image
-        self.features = features
+        self.episodes_count = 0
+        self.network = network
+        self.dataset = dataset
+        self.labels = labels
+        self.dataset_length = len(self.dataset)
+        self.num_layers = num_layers
+        # Extracting current training image from dataset
+        self.train_image = None
+        self.image_class = None
+        # CNN representation of the extracted image
+        self.features = None
         # CNN distribution over selected image
-        self.distribution = distribution
+        self.distribution = None
         # Ground truth from CIFAR10
-        self.train_image = train_image
-        self.image_class = image_class
-        self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
+        self.ground_truth = range(10)
         # Will need this for computing the reward
-        self.agent_classification = None
         self.actions = DyadicConvnetGymEnv.Actions
         # Double action space
-        self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
+        """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
-                                         })
+                                         })"""
+        self.action_space = spaces.Discrete(n=len(self.ground_truth) + len(self.actions))
         # 64 conv features
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(64,), dtype=np.float32)
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
@@ -49,60 +55,60 @@ class DyadicConvnetGymEnv(gym.Env):
         self.mov_reward = 0.0
         # Drawing
         self.visualize = visualize
-        self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=len(self.features), pos=(0, 0, 0))
-        self.drawer = Drawer(self.agent_sprite, num_layers=len(self.features), tile_width=tile_width)
+        self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=self.num_layers, pos=(0, 0, 0)) if self.visualize else None
+        self.drawer = Drawer(self.agent_sprite, num_layers=self.num_layers, tile_width=tile_width) if self.visualize else None
 
     def step(self, action):
         self.step_count += 1
         done = False
         self.class_reward = 0.0
         self.mov_reward = 0.0
-        action = dict(action)
         old_pos = self.agent_pos
-        if action['movement'] == self.actions.down:
+        # New agent position based on the movement action
+        if action == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
                                   int(self.agent_pos[2]/2))
-        elif action['movement'] == self.actions.up_top_left:
+        elif action == self.actions.up_top_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2])
-        elif action['movement'] == self.actions.up_top_right:
+        elif action == self.actions.up_top_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2])
-        elif action['movement'] == self.actions.up_bottom_left:
+        elif action == self.actions.up_bottom_left:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2] + 1)
-        elif action['movement'] == self.actions.up_bottom_right:
+        elif action == self.actions.up_bottom_right:
             if self.agent_pos[0] > 0:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
+        elif action == self.actions.stay:
+            pass
+        # If agent classifies, end the episode
         else:
-            assert False, 'unknown action'
+            self.class_reward = 1.0 if action == self.image_class else 0.0
+            done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
-            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=self.image_class,
-                               predicted=action['classification'], first_step=False)
+            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
+                               predicted=action if action < 10 else None, first_step=False)
         if self.step_count >= self.max_steps:
             done = True
 
-        # Categorical CrossEntropy between ground truth and classifier
-        """cross_entropy = self.agent_reward_loss(self.ground_truth, self.agent_classification)
-        self.class_reward = -tf.keras.backend.get_value(cross_entropy)"""
-        self.class_reward = 1.0 if action['classification'] == self.image_class else 0.0
         # Punishing the agent for illegal actions
-        if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                                      self.actions.up_top_left, self.actions.up_bottom_left]:
+        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                          self.actions.up_top_left, self.actions.up_bottom_left]:
             self.mov_reward = -0.5
-        elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
+        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
             self.mov_reward = -0.5
         else:
             self.mov_reward = 0.0
@@ -124,6 +130,7 @@ class DyadicConvnetGymEnv(gym.Env):
             c_3 = 0.3
 
         reward = gamma * c_1 + delta * c_2 + c_3"""
+        # Negative reward - 0.001 for each timestep (later!)
         reward = self.class_reward + self.mov_reward
 
         obs = self.gen_obs()
@@ -131,49 +138,40 @@ class DyadicConvnetGymEnv(gym.Env):
         return obs, reward, done, {}
 
     def reset(self):
-        # Encoded as (layer, x, y)
+        # New image extraction
+        self.train_image = self.dataset[self.episodes_count]
+        self.image_class = self.labels[self.episodes_count]
+        # CNN representation of the extracted image
+        image_4dim = np.reshape(self.train_image, (1, 32, 32, 3))
+        self.features = self.network.extract_features(image_4dim)
+        # CNN distribution over selected image
+        self.distribution = np.reshape(self.network(image_4dim).numpy(), (10,))
+        # Ground truth from CIFAR10
+        self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
+        # Go to next index
+        self.episodes_count = (self.episodes_count + 1) % self.dataset_length
+        # Agent starting position encoded as (layer, x, y)
         starting_layer = np.random.randint(0, len(self.features) - 1)
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
         self.step_count = 0
-        self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
 
         obs = {
-            'features': self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]]
+            'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]], self.agent_pos),
+                                       axis=0)
         }
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
-            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=self.image_class,
-                               predicted=np.argmax(self.distribution), first_step=True)
-        """obs_feats = []
-        for i in range(self.agent_pos[1] - 1, self.agent_pos[1] + 2):
-            for j in range(self.agent_pos[2] - 1, self.agent_pos[2] + 2):
-                if 0 <= i < self.features[self.agent_pos[0]].shape[0] and \
-                   0 <= j < self.features[self.agent_pos[0]].shape[0]:
-                    obs_feats.append(self.features[self.agent_pos[0]][i][j])
-                else:
-                    obs_feats.append(np.zeros((64,)))
-        obs = {
-            'features': np.concatenate(obs_feats, axis=0)
-        }"""
+            self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
+                               predicted=None, first_step=True)
 
         return obs
 
     def gen_obs(self):
         obs = {
-            'features': self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]]
+            'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]], self.agent_pos),
+                                       axis=0)
         }
-        """obs_feats = []
-        for i in range(self.agent_pos[1] - 1, self.agent_pos[1] + 2):
-            for j in range(self.agent_pos[2] - 1, self.agent_pos[2] + 2):
-                if 0 <= i < self.features[self.agent_pos[0]].shape[0] and \
-                        0 <= j < self.features[self.agent_pos[0]].shape[0]:
-                    obs_feats.append(self.features[self.agent_pos[0]][i][j])
-                else:
-                    obs_feats.append(np.zeros((64,)))
-        obs = {
-            'features': np.concatenate(obs_feats, axis=0)
-        }"""
 
         return obs

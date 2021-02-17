@@ -123,13 +123,13 @@ def one_image_per_class(labels, num_classes):
     return indexes, selected
 
 
-def n_images_per_class(n, labels, num_classes):
+def n_images_per_class(n, labels, num_classes, starting_index=0):
     indexes = []
     ordered_labels = []
     for j in range(n):
         selected = []
         # avoid repetitions
-        i = np.max(indexes)+1 if len(indexes) > 0 else 0
+        i = np.max(indexes)+1 if len(indexes) > 0 else starting_index
         while len(selected) < num_classes:
             if labels[i] not in selected:
                 selected.append([int(labels[i])])
