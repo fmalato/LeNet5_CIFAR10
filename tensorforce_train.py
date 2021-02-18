@@ -10,7 +10,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from utils import one_image_per_class, n_images_per_class
+from utils import split_dataset, n_images_per_class
 
 
 if __name__ == '__main__':
@@ -25,10 +25,10 @@ if __name__ == '__main__':
         e_r = 0.05
         # Control parameters
         visualize = False
-        load_checkpoint = False
+        load_checkpoint = True
         train = True
         starting_index = 0
-        images_per_class = 1
+        images_per_class = 50
         ########################### PREPROCESSING ##############################
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
@@ -36,16 +36,17 @@ if __name__ == '__main__':
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
-        # Extracting one image per class - comment for whole dataset
-        indexes, labels = n_images_per_class(n=images_per_class, labels=train_labels, num_classes=len(class_names),
+        train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=train_images, labels=train_labels, ratio=0.8)
+        """# Extracting one image per class for testing the agent
+        indexes, labels = n_images_per_class(n=images_per_class, labels=test_labels, num_classes=len(class_names),
                                              starting_index=starting_index)
-        train_images = np.array([train_images[idx] for idx in indexes])
-        train_labels = np.array(labels)
+        test_images = np.array([test_images[idx] for idx in indexes])
+        test_labels = np.array(labels)"""
         #########################################################################
-        # Environment initialization
+        # Training environment initialization
         environment = DyadicConvnetGymEnv(network=net,
-                                          dataset=train_images,
-                                          labels=train_labels,
+                                          dataset=train_images if train else test_images,
+                                          labels=train_labels if train else test_labels,
                                           max_steps=steps_per_episode,
                                           visualize=visualize
                                           )
@@ -54,13 +55,28 @@ if __name__ == '__main__':
                                          states=dict(
                                              features=dict(type=float, shape=(67,)),
                                          ),
-                                         actions=dict(type=int, num_values=16),
+                                         actions=dict(type=int, num_values=num_actions+10),
                                          max_episode_timesteps=steps_per_episode
                                          )
+        # Validation environment initialization
+        valid_environment = DyadicConvnetGymEnv(network=net,
+                                                dataset=valid_images,
+                                                labels=train_labels,
+                                                max_steps=steps_per_episode,
+                                                visualize=visualize
+                                                )
+        num_actions = len(valid_environment.actions)
+        valid_environment = Environment.create(environment=valid_environment,
+                                               states=dict(
+                                                   features=dict(type=float, shape=(67,)),
+                                               ),
+                                               actions=dict(type=int, num_values=num_actions + 10),
+                                               max_episode_timesteps=steps_per_episode
+                                               )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210216-101807/'
-            old_episodes = 18000
+            directory = 'models/RL/20210218-133835/'
+            old_episodes = 530000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -86,7 +102,7 @@ if __name__ == '__main__':
                                states=dict(
                                    features=dict(type=float, shape=(67,)),
                                ),
-                               actions=dict(type=int, num_values=16),
+                               actions=dict(type=int, num_values=num_actions+10),
                                entropy_regularization=e_r
                                )
         else:
@@ -112,7 +128,7 @@ if __name__ == '__main__':
                                  states=dict(
                                      features=dict(type=float, shape=(67,)),
                                  ),
-                                 actions=dict(type=int, num_values=16),
+                                 actions=dict(type=int, num_values=num_actions+10),
                                  entropy_regularization=e_r
                                  )
         # Parameters for training loop
@@ -124,7 +140,7 @@ if __name__ == '__main__':
         else:
             save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         # Train/test loop
-        while episode <= 6000:
+        while episode <= 470000:
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
@@ -147,8 +163,8 @@ if __name__ == '__main__':
             sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
             sys.stdout.flush()
             episode += 1
-            # Saving model every 1000 episodes
-            if episode % 1000 == 0:
+            # Saving model every 10000 episodes
+            if episode % 10000 == 0:
                 agent.save(directory=save_dir,
                            filename='agent-{ep}'.format(ep=episode+old_episodes),
                            format='hdf5')
@@ -157,3 +173,26 @@ if __name__ == '__main__':
                     f.write('policy learning rate: %f \n' % policy_lr)
                     f.write('baseline learning rate: %f \n' % baseline_lr)
                     f.write('episode length: %d \n' % steps_per_episode)
+            # Validating at the end of every epoch
+            if episode % 40000 == 0:
+                rewards = []
+                correct = 0
+                valid_environment.environment.episodes_count = 0
+                for i in range(1, len(valid_labels) + 1):
+                    terminal = False
+                    ep_reward = 0
+                    obs = valid_environment.reset()
+                    while not terminal:
+                        action, internals = agent.act(states=dict(features=obs['features']), internals=internals,
+                                                      independent=True, deterministic=True)
+                        state, terminal, reward = valid_environment.execute(actions=action)
+                        if terminal:
+                            if action == valid_labels[i-1]:
+                                correct += 1
+                        ep_reward += reward
+                    rewards.append(ep_reward)
+                    avg_reward = np.sum(rewards) / len(rewards)
+                    sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i, cr=round(avg_reward, 3),
+                                                                                                                 ok=round((correct / i)*100, 2)))
+                    sys.stdout.flush()
+                print('\n')

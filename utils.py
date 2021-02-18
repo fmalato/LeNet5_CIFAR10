@@ -138,3 +138,9 @@ def n_images_per_class(n, labels, num_classes, starting_index=0):
             i += 1
 
     return indexes, ordered_labels
+
+
+def split_dataset(dataset, labels, ratio=0.8):
+    splitting_index = int(len(dataset)*ratio)
+
+    return dataset[:splitting_index], dataset[splitting_index:], labels[:splitting_index], labels[splitting_index:]

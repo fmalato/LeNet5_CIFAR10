@@ -18,7 +18,6 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_left = 12
         up_top_right = 13
         up_bottom_right = 14
-        stay = 15
 
     def __init__(self, network, dataset, labels, max_steps, visualize=False, tile_width=10, num_layers=5):
         super(DyadicConvnetGymEnv, self).__init__()
@@ -90,12 +89,10 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
-        elif action == self.actions.stay:
-            pass
         # If agent classifies, end the episode
         else:
             self.class_reward = 1.0 if action == self.image_class else 0.0
-            done = True
+            #done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
