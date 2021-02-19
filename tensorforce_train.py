@@ -1,4 +1,4 @@
-import random
+import os
 import sys
 import datetime
 
@@ -24,10 +24,10 @@ if __name__ == '__main__':
         baseline_lr = 1e-2
         e_r = 0.05
         # Control parameters
-        visualize = False
+        visualize = True
         load_checkpoint = True
-        train = True
-        num_epochs = 20
+        train = False
+        num_epochs = 18
         starting_index = 0
         images_per_class = 50
         ########################### PREPROCESSING ##############################
@@ -43,6 +43,9 @@ if __name__ == '__main__':
                                              starting_index=starting_index)
         test_images = np.array([test_images[idx] for idx in indexes])
         test_labels = np.array(labels)"""
+        num_episodes = len(train_labels) * num_epochs
+        num_images = len(train_labels)
+        len_valid = len(valid_labels)
         #########################################################################
         # Training environment initialization
         environment = DyadicConvnetGymEnv(network=net,
@@ -76,8 +79,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210218-133835/'
-            old_episodes = 570000
+            directory = 'models/RL/20210219-100552/'
+            old_episodes = 600000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -140,59 +143,62 @@ if __name__ == '__main__':
             save_dir = directory
         else:
             save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        # Train/test loop
-        while episode <= len(train_labels) * num_epochs:
-            state = environment.reset()
-            cum_reward = 0.0
-            terminal = False
-            first_step = True
-            if not train:
-                internals = agent.initial_internals()
-            # Episode loop
-            while not terminal:
-                if train:
-                    action = agent.act(states=dict(features=state['features']))
-                else:
-                    action, internals = agent.act(states=dict(features=state['features']), internals=internals,
-                                                  independent=True, deterministic=True)
-                state, terminal, reward = environment.execute(actions=action)
-                if train:
-                    agent.observe(terminal=terminal, reward=reward)
-                cum_reward += reward
-                first_step = False
-            # Stats for current episode
-            sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
-            sys.stdout.flush()
-            episode += 1
-            # Saving model every 10000 episodes
-            if episode % 10000 == 0:
-                agent.save(directory=save_dir,
-                           filename='agent-{ep}'.format(ep=episode+old_episodes),
-                           format='hdf5')
-            # Validating at the end of every epoch
-            if episode % len(train_labels) == 0:
-                print('\n')
-                rewards = []
-                correct = 0
-                valid_environment.environment.episodes_count = 0
-                for i in range(1, len(valid_labels) + 1):
-                    terminal = False
-                    ep_reward = 0
-                    obs = valid_environment.reset()
-                    internals_valid = agent.initial_internals()
-                    while not terminal:
-                        action, internals = agent.act(states=dict(features=obs['features']), internals=internals_valid,
+        if not load_checkpoint and (save_dir not in os.listdir('models/RL/')):
+            os.mkdir(save_dir)
+        # Need to call this now not to overwrite file results
+        with open(save_dir + 'validation_stats.txt' if train else 'foo.txt', 'w+') as f:
+            # Train/test loop
+            while episode <= num_episodes:
+                state = environment.reset()
+                cum_reward = 0.0
+                terminal = False
+                first_step = True
+                if not train:
+                    internals = agent.initial_internals()
+                # Episode loop
+                while not terminal:
+                    if train:
+                        action = agent.act(states=dict(features=state['features']))
+                    else:
+                        action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                       independent=True, deterministic=True)
-                        state, terminal, reward = valid_environment.execute(actions=action)
-                        if terminal:
-                            if action == valid_labels[i-1]:
-                                correct += 1
-                        ep_reward += reward
-                    rewards.append(ep_reward)
-                    avg_reward = np.sum(rewards) / len(rewards)
-                    sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i, cr=round(avg_reward, 3),
-                                                                                                                 ok=round((correct / i)*100, 2)))
-                    sys.stdout.flush()
-                with open(save_dir + '/validation_stats.txt', 'w+') as f:
-                    f.write('%d, %f, %f\n' % (episode, round(avg_reward, 3), round((correct / i)*100, 2)))
-                print('\n')
+                    state, terminal, reward = environment.execute(actions=action)
+                    if train:
+                        agent.observe(terminal=terminal, reward=reward)
+                    cum_reward += reward
+                    first_step = False
+                # Stats for current episode
+                sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=cum_reward))
+                sys.stdout.flush()
+                episode += 1
+                # Saving model at the end of each epoch
+                if episode % num_images == 0:
+                    agent.save(directory=save_dir,
+                               filename='agent-{ep}'.format(ep=episode+old_episodes),
+                               format='hdf5')
+                # Validating at the end of each epoch
+                if episode % num_images == 0:
+                    print('\n')
+                    rewards = []
+                    correct = 0
+                    valid_environment.environment.episodes_count = 0
+                    for i in range(1, len_valid + 1):
+                        terminal = False
+                        ep_reward = 0
+                        obs = valid_environment.reset()
+                        internals_valid = agent.initial_internals()
+                        while not terminal:
+                            action, internals = agent.act(states=dict(features=obs['features']), internals=internals_valid,
+                                                          independent=True, deterministic=True)
+                            state, terminal, reward = valid_environment.execute(actions=action)
+                            if terminal:
+                                if action == valid_labels[i-1]:
+                                    correct += 1
+                            ep_reward += reward
+                        rewards.append(ep_reward)
+                        avg_reward = np.sum(rewards) / len(rewards)
+                        sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i, cr=round(avg_reward, 3),
+                                                                                                                     ok=round((correct / i)*100, 2)))
+                        sys.stdout.flush()
+                    f.write('%d, %f, %f\n' % (old_episodes+episode, round(avg_reward, 3), round((correct / i)*100, 2)))
+                    print('\n')
