@@ -19,7 +19,7 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 1
-        steps_per_episode = 10
+        steps_per_episode = 15
         policy_lr = 1e-3
         baseline_lr = 1e-2
         e_r = 0.05
@@ -27,6 +27,7 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = True
         train = True
+        num_epochs = 20
         starting_index = 0
         images_per_class = 50
         ########################### PREPROCESSING ##############################
@@ -76,7 +77,7 @@ if __name__ == '__main__':
         # Agent initialization
         if load_checkpoint:
             directory = 'models/RL/20210218-133835/'
-            old_episodes = 530000
+            old_episodes = 570000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -140,7 +141,7 @@ if __name__ == '__main__':
         else:
             save_dir = 'models/RL/{x}/'.format(x=datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         # Train/test loop
-        while episode <= 470000:
+        while episode <= len(train_labels) * num_epochs:
             state = environment.reset()
             cum_reward = 0.0
             terminal = False
@@ -168,13 +169,9 @@ if __name__ == '__main__':
                 agent.save(directory=save_dir,
                            filename='agent-{ep}'.format(ep=episode+old_episodes),
                            format='hdf5')
-                with open(save_dir + '/parameters.txt', 'w+') as f:
-                    f.write('entropy regularization: %d \n' % e_r)
-                    f.write('policy learning rate: %f \n' % policy_lr)
-                    f.write('baseline learning rate: %f \n' % baseline_lr)
-                    f.write('episode length: %d \n' % steps_per_episode)
             # Validating at the end of every epoch
-            if episode % 40000 == 0:
+            if episode % len(train_labels) == 0:
+                print('\n')
                 rewards = []
                 correct = 0
                 valid_environment.environment.episodes_count = 0
@@ -182,8 +179,9 @@ if __name__ == '__main__':
                     terminal = False
                     ep_reward = 0
                     obs = valid_environment.reset()
+                    internals_valid = agent.initial_internals()
                     while not terminal:
-                        action, internals = agent.act(states=dict(features=obs['features']), internals=internals,
+                        action, internals = agent.act(states=dict(features=obs['features']), internals=internals_valid,
                                                       independent=True, deterministic=True)
                         state, terminal, reward = valid_environment.execute(actions=action)
                         if terminal:
@@ -195,4 +193,6 @@ if __name__ == '__main__':
                     sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i, cr=round(avg_reward, 3),
                                                                                                                  ok=round((correct / i)*100, 2)))
                     sys.stdout.flush()
+                with open(save_dir + '/validation_stats.txt', 'w+') as f:
+                    f.write('%d, %f, %f\n' % (episode, round(avg_reward, 3), round((correct / i)*100, 2)))
                 print('\n')
