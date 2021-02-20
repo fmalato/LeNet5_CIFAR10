@@ -137,10 +137,16 @@ class DyadicConvnetGymEnv(gym.Env):
     def reset(self):
         # New image extraction
         self.train_image = self.dataset[self.episodes_count]
-        self.image_class = self.labels[self.episodes_count]
+        self.image_class = int(self.labels[self.episodes_count])
         # CNN representation of the extracted image
         image_4dim = np.reshape(self.train_image, (1, 32, 32, 3))
         self.features = self.network.extract_features(image_4dim)
+        """self.features = {}
+        i = 0
+        for key in feats.keys():
+            if key in [2, 3, 4]:
+                self.features[i] = feats[key]
+                i += 1"""
         # CNN distribution over selected image
         self.distribution = np.reshape(self.network(image_4dim).numpy(), (10,))
         # Ground truth from CIFAR10
@@ -148,9 +154,12 @@ class DyadicConvnetGymEnv(gym.Env):
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
-        starting_layer = np.random.randint(0, len(self.features) - 1)
+        """starting_layer = np.random.randint(0, len(self.features) - 1)
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
-        starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
+        starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0"""
+        starting_layer = 4
+        starting_x = 0
+        starting_y = 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
         self.step_count = 0
 

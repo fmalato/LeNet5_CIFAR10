@@ -18,21 +18,25 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
-        batch_size = 1
+        batch_size = 5
+        discount = 0.99
+        num_classes = 10
+        lstm_horizon = 5
         steps_per_episode = 15
         policy_lr = 1e-3
         baseline_lr = 1e-2
         e_r = 0.05
         # Control parameters
-        visualize = True
+        visualize = False
         load_checkpoint = True
         train = False
-        num_epochs = 18
+        # Train/test parameters
+        num_epochs = 15
         starting_index = 0
         images_per_class = 50
         ########################### PREPROCESSING ##############################
         # Network initialization
-        net = DyadicConvNet(num_channels=64, input_shape=(batch_size, 32, 32, 3))
+        net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210204-122725.h5')
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
@@ -59,27 +63,28 @@ if __name__ == '__main__':
                                          states=dict(
                                              features=dict(type=float, shape=(67,)),
                                          ),
-                                         actions=dict(type=int, num_values=num_actions+10),
+                                         actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
         # Validation environment initialization
         valid_environment = DyadicConvnetGymEnv(network=net,
                                                 dataset=valid_images,
-                                                labels=train_labels,
+                                                labels=valid_labels,
                                                 max_steps=steps_per_episode,
-                                                visualize=visualize
+                                                visualize=visualize,
+                                                num_layers=3
                                                 )
         num_actions = len(valid_environment.actions)
         valid_environment = Environment.create(environment=valid_environment,
                                                states=dict(
                                                    features=dict(type=float, shape=(67,)),
                                                ),
-                                               actions=dict(type=int, num_values=num_actions + 10),
+                                               actions=dict(type=int, num_values=num_actions+num_classes),
                                                max_episode_timesteps=steps_per_episode
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210219-100552/'
+            directory = 'models/RL/20210220-173206/'
             old_episodes = 600000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
@@ -88,10 +93,10 @@ if __name__ == '__main__':
                                environment=environment,
                                agent='ppo',
                                network=[
-                                       dict(type='lstm', size=64, horizon=5, activation='relu'),
+                                       dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
                                ],
                                baseline=[
-                                   dict(type='lstm', size=64, horizon=5, activation='relu')
+                                   dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                # Tensorboard initialized only if training
@@ -100,13 +105,13 @@ if __name__ == '__main__':
                                    summaries='all'
                                ) if train else None,
                                learning_rate=policy_lr,
-                               batch_size=5,
+                               batch_size=batch_size,
                                tracking=['distribution'],
-                               discount=0.99,
+                               discount=discount,
                                states=dict(
                                    features=dict(type=float, shape=(67,)),
                                ),
-                               actions=dict(type=int, num_values=num_actions+10),
+                               actions=dict(type=int, num_values=num_actions+num_classes),
                                entropy_regularization=e_r
                                )
         else:
@@ -114,10 +119,10 @@ if __name__ == '__main__':
             agent = Agent.create(environment=environment,
                                  agent='ppo',
                                  network=[
-                                     dict(type='lstm', size=64, horizon=5, activation='relu'),
+                                     dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
                                  ],
                                  baseline=[
-                                     dict(type='lstm', size=64, horizon=5, activation='relu')
+                                     dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
                                  ],
                                  baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                  # Tensorboard initialized only if training
@@ -126,13 +131,13 @@ if __name__ == '__main__':
                                        summaries='all'
                                    ) if train else None,
                                  learning_rate=policy_lr,
-                                 batch_size=5,
+                                 batch_size=batch_size,
                                  tracking=['distribution'],
-                                 discount=0.99,
+                                 discount=discount,
                                  states=dict(
                                      features=dict(type=float, shape=(67,)),
                                  ),
-                                 actions=dict(type=int, num_values=num_actions+10),
+                                 actions=dict(type=int, num_values=num_actions+num_classes),
                                  entropy_regularization=e_r
                                  )
         # Parameters for training loop
@@ -177,7 +182,7 @@ if __name__ == '__main__':
                                filename='agent-{ep}'.format(ep=episode+old_episodes),
                                format='hdf5')
                 # Validating at the end of each epoch
-                if episode % num_images == 0:
+                if episode % 1 == 0:
                     print('\n')
                     rewards = []
                     correct = 0
