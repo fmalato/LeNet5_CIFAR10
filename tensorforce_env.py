@@ -19,7 +19,8 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 13
         up_bottom_right = 14
 
-    def __init__(self, network, dataset, labels, max_steps, visualize=False, tile_width=10, num_layers=5):
+    def __init__(self, network, dataset, labels, max_steps, visualize=False, tile_width=10, num_layers=5,
+                 class_penalty=0.1):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.network = network
@@ -48,10 +49,13 @@ class DyadicConvnetGymEnv(gym.Env):
                                               })
         self.step_count = 0
         self.agent_pos = None
+        self.agent_classification = None
+        self.right_old_class = 0.0
         self.max_steps = max_steps
         self.agent_reward_loss = CategoricalCrossentropy()
         self.class_reward = 0.0
         self.mov_reward = 0.0
+        self.class_penalty = class_penalty
         # Drawing
         self.visualize = visualize
         self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=self.num_layers, pos=(0, 0, 0)) if self.visualize else None
@@ -91,8 +95,9 @@ class DyadicConvnetGymEnv(gym.Env):
                                   2*self.agent_pos[2] + 1)
         # If agent classifies, end the episode
         else:
-            self.class_reward = 5.0 if action == self.image_class else 0.0
-            done = True
+            self.class_reward = 1.0 if action == self.image_class else -self.class_penalty
+            if action == self.image_class:
+                done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
@@ -110,21 +115,20 @@ class DyadicConvnetGymEnv(gym.Env):
         else:
             self.mov_reward = 0.0
 
-        # Confidence in predicted class
-        """gamma = self.agent_classification[action['classification']]
-        c_1 = 2.0 if action['classification'] == self.image_class else -2.0
+        """# Confidence in predicted class
+        gamma = self.agent_classification[action] if action < 10 else 0.0
+        c_1 = 2.0 if action == self.image_class else -2.0
         # Confidence in correct class at timestep t - same at timestep (t-1)
         delta = self.agent_classification[self.image_class] - self.right_old_class
         c_2 = 0.3
         # Illegal move
-        if old_pos[0] == 0 and action['movement'] in [self.actions.up_bottom_right, self.actions.up_top_right,
+        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
                                                       self.actions.up_top_left, self.actions.up_bottom_left]:
             c_3 = -0.3
-        elif old_pos[0] == len(self.features) - 1 and action['movement'] == self.actions.down:
+        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
             c_3 = -0.3
-        # Legal move - Maybe this can be avioded
         else:
-            c_3 = 0.3
+            c_3 = 0.0
 
         reward = gamma * c_1 + delta * c_2 + c_3"""
         # Negative reward - 0.001 for each timestep (later!)
@@ -162,11 +166,7 @@ class DyadicConvnetGymEnv(gym.Env):
         starting_y = 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
         self.step_count = 0
-
-        obs = {
-            'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]], self.agent_pos),
-                                       axis=0)
-        }
+        obs = self.gen_obs()
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
@@ -175,9 +175,18 @@ class DyadicConvnetGymEnv(gym.Env):
         return obs
 
     def gen_obs(self):
+        # Adding random gaussian noise to features vector
+        #noise = np.random.normal(0, .01, (64,))
+        feats = self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]] #+ noise
         obs = {
-            'features': np.concatenate((self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]], self.agent_pos),
-                                       axis=0)
+            'features': np.concatenate((feats, self.agent_pos), axis=0)
         }
 
         return obs
+
+    def set_agent_classification(self, value):
+        if self.agent_classification is not None:
+            self.right_old_class = np.max(self.agent_classification) if np.argmax(self.agent_classification) < 10 else 0.0
+        else:
+            self.right_old_class = 0.0
+        self.agent_classification = value
