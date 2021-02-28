@@ -113,7 +113,7 @@ class DyadicConvnetGymEnv(gym.Env):
         elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
             self.mov_reward = -0.5
         else:
-            self.mov_reward = 0.0
+            self.mov_reward = 0.05
 
         """# Confidence in predicted class
         gamma = self.agent_classification[action] if action < 10 else 0.0

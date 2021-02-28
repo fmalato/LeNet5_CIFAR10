@@ -58,7 +58,7 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210225-093245/']
+        dirs = ['models/RL/20210227-100424/']
         for directory in dirs:
             print('Testing {dir}'.format(dir=directory))
             old_episodes = 200000
