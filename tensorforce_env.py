@@ -64,6 +64,7 @@ class DyadicConvnetGymEnv(gym.Env):
     def step(self, action):
         self.step_count += 1
         done = False
+        forced_move = False
         self.class_reward = 0.0
         self.mov_reward = 0.0
         old_pos = self.agent_pos
@@ -93,11 +94,25 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
-        # If agent classifies, end the episode
+        # If agent classifies well, end the episode
         else:
             self.class_reward = 1.0 if action == self.image_class else -self.class_penalty
             if action == self.image_class:
                 done = True
+            # If classification is wrong, force the agent to move randomly
+            else:
+                positions = []
+                if self.agent_pos[0] < self.num_layers - 1:
+                    positions.append(
+                        (self.agent_pos[0] + 1, int(self.agent_pos[1] / 2), int(self.agent_pos[2] / 2)))
+                if self.agent_pos[0] > 0:
+                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1], 2 * self.agent_pos[2]))
+                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1] + 1, 2 * self.agent_pos[2]))
+                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1], 2 * self.agent_pos[2] + 1))
+                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1] + 1, 2 * self.agent_pos[2] + 1))
+                old_pos = self.agent_pos
+                self.agent_pos = positions[np.random.choice(range(len(positions)))]
+                forced_move = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
@@ -106,14 +121,16 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.step_count >= self.max_steps:
             done = True
 
-        # Punishing the agent for illegal actions
-        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                          self.actions.up_top_left, self.actions.up_bottom_left]:
-            self.mov_reward = -0.5
-        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
-            self.mov_reward = -0.5
-        else:
-            self.mov_reward = 0.05
+        # Can't blame/reward the agent for what it was forced to do
+        if not forced_move:
+            # Punishing the agent for illegal actions
+            if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                              self.actions.up_top_left, self.actions.up_bottom_left]:
+                self.mov_reward = -0.5
+            elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
+                self.mov_reward = -0.5
+            else:
+                self.mov_reward = 0.01
 
         """# Confidence in predicted class
         gamma = self.agent_classification[action] if action < 10 else 0.0

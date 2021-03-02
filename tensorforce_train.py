@@ -43,7 +43,7 @@ if __name__ == '__main__':
         num_episodes = len(train_labels) * num_epochs
         num_images = len(train_labels)
         len_valid = len(valid_labels)
-        class_penalties = [0.2]
+        class_penalties = [0.15]
         for cp in class_penalties:
             print('Current classification penalty term: {x}'.format(x=cp))
             #########################################################################
