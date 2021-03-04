@@ -31,7 +31,7 @@ if __name__ == '__main__':
         load_checkpoint = False
         train = True
         # Train/test parameters
-        num_epochs = 5
+        num_epochs = 7
         ########################### PREPROCESSING ##############################
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
@@ -43,7 +43,7 @@ if __name__ == '__main__':
         num_episodes = len(train_labels) * num_epochs
         num_images = len(train_labels)
         len_valid = len(valid_labels)
-        class_penalties = [0.3]
+        class_penalties = [0.5]
         for cp in class_penalties:
             print('Current classification penalty term: {x}'.format(x=cp))
             #########################################################################
@@ -143,6 +143,7 @@ if __name__ == '__main__':
             first_time = True
             episode = 0
             epoch_correct = 0
+            current_ep = 0
             # Where to store checkpoints
             if load_checkpoint:
                 save_dir = directory
@@ -172,14 +173,15 @@ if __name__ == '__main__':
                         if train:
                             agent.observe(terminal=terminal, reward=reward)
                         if terminal:
-                            if action == valid_labels[i - 1]:
+                            if action == train_labels[episode % num_images]:
                                 epoch_correct += 1
                         cum_reward += reward
                         first_step = False
+                        current_ep += 1
                     # Stats for current episode
                     sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(ep=episode+old_episodes,
                                                                                                          cr=round(cum_reward, 3),
-                                                                                                         ec=round((epoch_correct / (episode % num_images))*100, 2)))
+                                                                                                         ec=round((epoch_correct / (current_ep % num_images))*100, 2)))
                     sys.stdout.flush()
                     episode += 1
                     # Saving model at the end of each epoch
