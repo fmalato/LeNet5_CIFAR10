@@ -26,8 +26,9 @@ if __name__ == '__main__':
         policy_lr = 1e-3
         baseline_lr = 1e-2
         e_r = 0.05
+        class_penalty = 0.5
         # Control parameters
-        visualize = True
+        visualize = False
         # Train/test parameters
         num_epochs = 1
         ########################### PREPROCESSING ##############################
@@ -41,14 +42,14 @@ if __name__ == '__main__':
         num_episodes = len(test_labels) * num_epochs
         num_images = len(test_labels)
         #########################################################################
-        # Training environment initialization
+        # Environment initialization
         environment = DyadicConvnetGymEnv(network=net,
                                           dataset=test_images,
                                           labels=test_labels,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
                                           num_layers=5,
-                                          class_penalty=0.01
+                                          class_penalty=class_penalty
                                           )
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
@@ -58,10 +59,10 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210302-114403']
+        dirs = ['models/RL/20210226-140541']
         for directory in dirs:
             print('Testing {dir}'.format(dir=directory))
-            old_episodes = 200000
+            old_episodes = 240000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -106,8 +107,8 @@ if __name__ == '__main__':
                     ep_reward += reward
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
-                sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i,
-                                                                                                             cr=round(avg_reward, 3),
-                                                                                                             ok=round((correct / i) * 100, 2)))
+                sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i,
+                                                                                                       cr=round(avg_reward, 3),
+                                                                                                       ok=round((correct / i) * 100, 2)))
                 sys.stdout.flush()
             print('\n')

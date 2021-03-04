@@ -39,7 +39,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.ground_truth = range(10)
         # Will need this for computing the reward
         self.actions = DyadicConvnetGymEnv.Actions
-        # Double action space
+        # Single action space
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })"""
@@ -99,20 +99,6 @@ class DyadicConvnetGymEnv(gym.Env):
             self.class_reward = 1.0 if action == self.image_class else -self.class_penalty
             if action == self.image_class:
                 done = True
-            # If classification is wrong, force the agent to move randomly
-            else:
-                positions = []
-                if self.agent_pos[0] < self.num_layers - 1:
-                    positions.append(
-                        (self.agent_pos[0] + 1, int(self.agent_pos[1] / 2), int(self.agent_pos[2] / 2)))
-                if self.agent_pos[0] > 0:
-                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1], 2 * self.agent_pos[2]))
-                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1] + 1, 2 * self.agent_pos[2]))
-                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1], 2 * self.agent_pos[2] + 1))
-                    positions.append((self.agent_pos[0] - 1, 2 * self.agent_pos[1] + 1, 2 * self.agent_pos[2] + 1))
-                old_pos = self.agent_pos
-                self.agent_pos = positions[np.random.choice(range(len(positions)))]
-                forced_move = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
@@ -130,24 +116,8 @@ class DyadicConvnetGymEnv(gym.Env):
             elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
                 self.mov_reward = -0.5
             else:
-                self.mov_reward = 0.01
+                self.mov_reward = 0.0
 
-        """# Confidence in predicted class
-        gamma = self.agent_classification[action] if action < 10 else 0.0
-        c_1 = 2.0 if action == self.image_class else -2.0
-        # Confidence in correct class at timestep t - same at timestep (t-1)
-        delta = self.agent_classification[self.image_class] - self.right_old_class
-        c_2 = 0.3
-        # Illegal move
-        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                                      self.actions.up_top_left, self.actions.up_bottom_left]:
-            c_3 = -0.3
-        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
-            c_3 = -0.3
-        else:
-            c_3 = 0.0
-
-        reward = gamma * c_1 + delta * c_2 + c_3"""
         # Negative reward - 0.001 for each timestep (later!)
         reward = self.class_reward + self.mov_reward
 
@@ -162,12 +132,6 @@ class DyadicConvnetGymEnv(gym.Env):
         # CNN representation of the extracted image
         image_4dim = np.reshape(self.train_image, (1, 32, 32, 3))
         self.features = self.network.extract_features(image_4dim)
-        """self.features = {}
-        i = 0
-        for key in feats.keys():
-            if key in [2, 3, 4]:
-                self.features[i] = feats[key]
-                i += 1"""
         # CNN distribution over selected image
         self.distribution = np.reshape(self.network(image_4dim).numpy(), (10,))
         # Ground truth from CIFAR10
@@ -175,10 +139,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
-        """starting_layer = np.random.randint(0, len(self.features) - 1)
-        starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
-        starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0"""
-        starting_layer = 4
+        starting_layer = 0
         starting_x = 0
         starting_y = 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
@@ -193,8 +154,7 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def gen_obs(self):
         # Adding random gaussian noise to features vector
-        #noise = np.random.normal(0, .01, (64,))
-        feats = self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]] #+ noise
+        feats = self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]]
         obs = {
             'features': np.concatenate((feats, self.agent_pos), axis=0)
         }

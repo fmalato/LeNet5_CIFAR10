@@ -35,7 +35,7 @@ if __name__ == '__main__':
         ########################### PREPROCESSING ##############################
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
-        net.load_weights('models/model_CIFAR10/20210204-122725.h5')
+        net.load_weights('models/model_CIFAR10/20210303-125114.h5')
         # Dataset initialization
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
@@ -43,7 +43,7 @@ if __name__ == '__main__':
         num_episodes = len(train_labels) * num_epochs
         num_images = len(train_labels)
         len_valid = len(valid_labels)
-        class_penalties = [0.15]
+        class_penalties = [0.3]
         for cp in class_penalties:
             print('Current classification penalty term: {x}'.format(x=cp))
             #########################################################################
@@ -83,8 +83,8 @@ if __name__ == '__main__':
                                                        )
             # Agent initialization
             if load_checkpoint:
-                directory = 'models/RL/20210220-173206/'
-                old_episodes = 600000
+                directory = 'models/RL/20210226-140541'
+                old_episodes = 200000
                 print('Loading checkpoint. Last episode: %d' % old_episodes)
                 agent = Agent.load(directory=directory,
                                    filename='agent-{x}'.format(x=old_episodes),
@@ -142,6 +142,7 @@ if __name__ == '__main__':
             # Parameters for training loop
             first_time = True
             episode = 0
+            epoch_correct = 0
             # Where to store checkpoints
             if load_checkpoint:
                 save_dir = directory
@@ -170,10 +171,15 @@ if __name__ == '__main__':
                         state, terminal, reward = environment.execute(actions=action)
                         if train:
                             agent.observe(terminal=terminal, reward=reward)
+                        if terminal:
+                            if action == valid_labels[i - 1]:
+                                epoch_correct += 1
                         cum_reward += reward
                         first_step = False
                     # Stats for current episode
-                    sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr}'.format(ep=episode+old_episodes, cr=round(cum_reward, 3)))
+                    sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(ep=episode+old_episodes,
+                                                                                                         cr=round(cum_reward, 3),
+                                                                                                         ec=round((epoch_correct / (episode % num_images))*100, 2)))
                     sys.stdout.flush()
                     episode += 1
                     # Saving model at the end of each epoch
@@ -181,11 +187,15 @@ if __name__ == '__main__':
                         agent.save(directory=save_dir,
                                    filename='agent-{ep}'.format(ep=episode+old_episodes),
                                    format='hdf5')
+                        # Reset correct count
+                        epoch_correct = 0
                     # Validating at the end of each epoch
                     if episode % num_images == 0 and train:
                         print('\n')
                         rewards = []
                         correct = 0
+                        class_attempt = 0
+                        mov_attempt = 0
                         valid_environment.environment.episodes_count = 0
                         for i in range(1, len_valid + 1):
                             terminal = False
@@ -201,10 +211,20 @@ if __name__ == '__main__':
                                     if action == valid_labels[i-1]:
                                         correct += 1
                                 ep_reward += reward
+                                if int(action) < 10:
+                                    class_attempt += 1
+                                else:
+                                    mov_attempt += 1
                             rewards.append(ep_reward)
                             avg_reward = np.sum(rewards) / len(rewards)
-                            sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i, cr=round(avg_reward, 3),
-                                                                                                                         ok=round((correct / i)*100, 2)))
+                            avg_class_attempt = class_attempt / i
+                            avg_mov_attempt = mov_attempt / i
+                            sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}% - Avg. Classification Moves: {ca} - Avg. Movement Moves: {ma}'
+                                             .format(ep=i, cr=round(avg_reward, 3),
+                                                     ok=round((correct / i)*100, 2),
+                                                     ca=round(avg_class_attempt, 2),
+                                                     ma=round(avg_mov_attempt, 2)))
                             sys.stdout.flush()
-                        f.write('%d, %f, %f\n' % (old_episodes+episode, round(avg_reward, 3), round((correct / i)*100, 2)))
+                        f.write('%d, %f, %f, %f\n' % (old_episodes+episode, round(avg_reward, 3),
+                                                      round((correct / i)*100, 2), round(avg_class_attempt, 2)))
                         print('\n')
