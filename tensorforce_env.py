@@ -43,18 +43,21 @@ class DyadicConvnetGymEnv(gym.Env):
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })"""
-        self.action_space = spaces.Discrete(n=len(self.ground_truth) + len(self.actions))
+        self.num_actions = len(self.ground_truth) + len(self.actions)
+        self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(67,), dtype=np.float32)
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(83,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
         self.agent_classification = None
+        self.one_hot_action = None
         self.right_old_class = 0.0
         self.max_steps = max_steps
         self.agent_reward_loss = CategoricalCrossentropy()
         self.class_reward = 0.0
         self.mov_reward = 0.0
+        self.last_reward = 0.0
         self.class_penalty = class_penalty
         # Drawing
         self.visualize = visualize
@@ -120,7 +123,8 @@ class DyadicConvnetGymEnv(gym.Env):
 
         # Negative reward - 0.001 for each timestep (later!)
         reward = self.class_reward + self.mov_reward
-
+        self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
+        self.last_reward = reward
         obs = self.gen_obs()
         # Why {}?
         return obs, reward, done, {}
@@ -156,7 +160,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Adding random gaussian noise to features vector
         feats = self.features[self.agent_pos[0]][self.agent_pos[1]][self.agent_pos[2]]
         obs = {
-            'features': np.concatenate((feats, self.agent_pos), axis=0)
+            'features': np.concatenate((feats, self.agent_pos, self.one_hot_action, self.last_reward), axis=0)
         }
 
         return obs

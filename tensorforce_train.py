@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 num_actions = len(valid_environment.actions)
                 valid_environment = Environment.create(environment=valid_environment,
                                                        states=dict(
-                                                           features=dict(type=float, shape=(67,)),
+                                                           features=dict(type=float, shape=(83,)),
                                                        ),
                                                        actions=dict(type=int, num_values=num_actions+num_classes),
                                                        max_episode_timesteps=steps_per_episode
@@ -101,14 +101,14 @@ if __name__ == '__main__':
                                    # Tensorboard initialized only if training
                                    summarizer=dict(
                                        directory='data/summaries',
-                                       summaries='all'
+                                       summaries=['action-value', 'entropy', 'reward']
                                    ) if train else None,
                                    learning_rate=policy_lr,
                                    batch_size=batch_size,
                                    tracking=['distribution'],
                                    discount=discount,
                                    states=dict(
-                                       features=dict(type=float, shape=(67,)),
+                                       features=dict(type=float, shape=(83,)),
                                    ),
                                    actions=dict(type=int, num_values=num_actions+num_classes),
                                    entropy_regularization=e_r
@@ -127,14 +127,14 @@ if __name__ == '__main__':
                                      # Tensorboard initialized only if training
                                      summarizer=dict(
                                            directory='data/summaries',
-                                           summaries='all'
+                                           summaries=['action-value', 'entropy', 'reward']
                                        ) if train else None,
                                      learning_rate=policy_lr,
                                      batch_size=batch_size,
                                      tracking=['distribution'],
                                      discount=discount,
                                      states=dict(
-                                         features=dict(type=float, shape=(67,)),
+                                         features=dict(type=float, shape=(83,)),
                                      ),
                                      actions=dict(type=int, num_values=num_actions+num_classes),
                                      entropy_regularization=e_r
@@ -173,17 +173,16 @@ if __name__ == '__main__':
                         if train:
                             agent.observe(terminal=terminal, reward=reward)
                         if terminal:
+                            # TODO: check numerical error here
                             if action == train_labels[episode % num_images]:
                                 epoch_correct += 1
                         cum_reward += reward
                         first_step = False
                         current_ep += 1
-                        if current_ep % num_images == 0:
-                            current_ep = 1
                     # Stats for current episode
                     sys.stdout.write('\rEpisode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(ep=episode+old_episodes,
                                                                                                          cr=round(cum_reward, 3),
-                                                                                                         ec=round((epoch_correct / current_ep)*100, 2)))
+                                                                                                         ec=round((epoch_correct / current_ep)*100, 3)))
                     sys.stdout.flush()
                     episode += 1
                     # Saving model at the end of each epoch
@@ -191,8 +190,9 @@ if __name__ == '__main__':
                         agent.save(directory=save_dir,
                                    filename='agent-{ep}'.format(ep=episode+old_episodes),
                                    format='hdf5')
-                        # Reset correct count
+                        # Reset correct and episode count
                         epoch_correct = 0
+                        current_ep = 1
                     # Validating at the end of each epoch
                     if episode % num_images == 0 and train:
                         print('\n')
