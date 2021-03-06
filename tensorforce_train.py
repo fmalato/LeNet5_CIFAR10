@@ -31,7 +31,7 @@ if __name__ == '__main__':
         load_checkpoint = False
         train = True
         # Train/test parameters
-        num_epochs = 7
+        num_epochs = 5
         ########################### PREPROCESSING ##############################
         # Network initialization
         net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
@@ -43,7 +43,7 @@ if __name__ == '__main__':
         num_episodes = len(train_labels) * num_epochs
         num_images = len(train_labels)
         len_valid = len(valid_labels)
-        class_penalties = [0.5]
+        class_penalties = [0.4]
         for cp in class_penalties:
             print('Current classification penalty term: {x}'.format(x=cp))
             #########################################################################
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                                    # Tensorboard initialized only if training
                                    summarizer=dict(
                                        directory='data/summaries',
-                                       summaries=['action-value', 'entropy', 'reward']
+                                       summaries=['action-value', 'entropy', 'reward', 'distribution']
                                    ) if train else None,
                                    learning_rate=policy_lr,
                                    batch_size=batch_size,
@@ -127,7 +127,7 @@ if __name__ == '__main__':
                                      # Tensorboard initialized only if training
                                      summarizer=dict(
                                            directory='data/summaries',
-                                           summaries=['action-value', 'entropy', 'reward']
+                                           summaries=['action-value', 'entropy', 'reward', 'distribution']
                                        ) if train else None,
                                      learning_rate=policy_lr,
                                      batch_size=batch_size,

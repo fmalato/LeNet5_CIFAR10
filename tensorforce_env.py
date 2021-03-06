@@ -57,7 +57,8 @@ class DyadicConvnetGymEnv(gym.Env):
         self.agent_reward_loss = CategoricalCrossentropy()
         self.class_reward = 0.0
         self.mov_reward = 0.0
-        self.last_reward = 0.0
+        self.last_reward = [0.0]
+        self.last_action = None
         self.class_penalty = class_penalty
         # Drawing
         self.visualize = visualize
@@ -124,7 +125,8 @@ class DyadicConvnetGymEnv(gym.Env):
         # Negative reward - 0.001 for each timestep (later!)
         reward = self.class_reward + self.mov_reward
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
-        self.last_reward = reward
+        self.last_reward = [reward]
+        self.last_action = action
         obs = self.gen_obs()
         # Why {}?
         return obs, reward, done, {}
@@ -147,6 +149,11 @@ class DyadicConvnetGymEnv(gym.Env):
         starting_x = 0
         starting_y = 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
+        # No need to re-initialize self.last_reward since it is already set to last value
+        if self.last_action is None:
+            self.one_hot_action = [0.0 for x in range(self.num_actions)]
+        else:
+            self.one_hot_action = [1.0 if x == self.last_action else 0.0 for x in range(self.num_actions)]
         self.step_count = 0
         obs = self.gen_obs()
         if self.visualize:
