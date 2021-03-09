@@ -2,10 +2,11 @@ import time
 import json
 import random
 import ast
-from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+from tensorflow.keras import datasets
 
 
 # Check execution time of a line/block of lines
@@ -144,3 +145,14 @@ def split_dataset(dataset, labels, ratio=0.8):
     splitting_index = int(len(dataset)*ratio)
 
     return dataset[:splitting_index], dataset[splitting_index:], labels[:splitting_index], labels[splitting_index:]
+
+
+def shuffle_data(dataset, labels):
+    shuffled_data = []
+    shuffled_labels = []
+    perm = np.random.permutation(len(dataset))
+    for i in range(len(dataset)):
+        shuffled_data.append(dataset[perm[i]])
+        shuffled_labels.append(labels[perm[i]])
+
+    return np.array(shuffled_data), np.array(shuffled_labels)

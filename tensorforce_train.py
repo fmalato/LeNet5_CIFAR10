@@ -10,7 +10,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from utils import split_dataset, n_images_per_class
+from utils import split_dataset, n_images_per_class, shuffle_data
 
 
 if __name__ == '__main__':
@@ -40,10 +40,13 @@ if __name__ == '__main__':
         (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
         train_images, test_images = train_images / 255.0, test_images / 255.0
         train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=train_images, labels=train_labels, ratio=0.8)
+        train_images, train_labels = shuffle_data(dataset=train_images, labels=train_labels)
+        valid_images, valid_labels = shuffle_data(dataset=valid_images, labels=valid_labels)
+        test_images, test_labels = shuffle_data(dataset=test_images, labels=test_labels)
         num_episodes = len(train_labels) * num_epochs
         num_images = len(train_labels)
         len_valid = len(valid_labels)
-        class_penalties = [0.4]
+        class_penalties = [0.5]
         for cp in class_penalties:
             print('Current classification penalty term: {x}'.format(x=cp))
             #########################################################################
@@ -59,7 +62,7 @@ if __name__ == '__main__':
             num_actions = len(environment.actions)
             environment = Environment.create(environment=environment,
                                              states=dict(
-                                                 features=dict(type=float, shape=(67,)),
+                                                 features=dict(type=float, shape=(78,)),
                                              ),
                                              actions=dict(type=int, num_values=num_actions+num_classes),
                                              max_episode_timesteps=steps_per_episode
@@ -76,13 +79,17 @@ if __name__ == '__main__':
                 num_actions = len(valid_environment.actions)
                 valid_environment = Environment.create(environment=valid_environment,
                                                        states=dict(
-                                                           features=dict(type=float, shape=(83,)),
+                                                           features=dict(type=float, shape=(78,)),
                                                        ),
                                                        actions=dict(type=int, num_values=num_actions+num_classes),
                                                        max_episode_timesteps=steps_per_episode
                                                        )
             # Agent initialization
             if load_checkpoint:
+                """summarizer=dict(
+                                       directory='data/summaries',
+                                       summaries=['action-value', 'entropy', 'reward', 'distribution']
+                                   ) if train else None"""
                 directory = 'models/RL/20210226-140541'
                 old_episodes = 200000
                 print('Loading checkpoint. Last episode: %d' % old_episodes)
@@ -99,16 +106,13 @@ if __name__ == '__main__':
                                    ],
                                    baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                    # Tensorboard initialized only if training
-                                   summarizer=dict(
-                                       directory='data/summaries',
-                                       summaries=['action-value', 'entropy', 'reward', 'distribution']
-                                   ) if train else None,
+                                   summarizer=None,
                                    learning_rate=policy_lr,
                                    batch_size=batch_size,
                                    tracking=['distribution'],
                                    discount=discount,
                                    states=dict(
-                                       features=dict(type=float, shape=(83,)),
+                                       features=dict(type=float, shape=(78,)),
                                    ),
                                    actions=dict(type=int, num_values=num_actions+num_classes),
                                    entropy_regularization=e_r
@@ -125,16 +129,13 @@ if __name__ == '__main__':
                                      ],
                                      baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                      # Tensorboard initialized only if training
-                                     summarizer=dict(
-                                           directory='data/summaries',
-                                           summaries=['action-value', 'entropy', 'reward', 'distribution']
-                                       ) if train else None,
+                                     summarizer=None,
                                      learning_rate=policy_lr,
                                      batch_size=batch_size,
                                      tracking=['distribution'],
                                      discount=discount,
                                      states=dict(
-                                         features=dict(type=float, shape=(83,)),
+                                         features=dict(type=float, shape=(78,)),
                                      ),
                                      actions=dict(type=int, num_values=num_actions+num_classes),
                                      entropy_regularization=e_r
@@ -173,7 +174,6 @@ if __name__ == '__main__':
                         if train:
                             agent.observe(terminal=terminal, reward=reward)
                         if terminal:
-                            # TODO: check numerical error here
                             if action == train_labels[episode % num_images]:
                                 epoch_correct += 1
                         cum_reward += reward
@@ -191,6 +191,7 @@ if __name__ == '__main__':
                                    filename='agent-{ep}'.format(ep=episode+old_episodes),
                                    format='hdf5')
                         # Reset correct and episode count
+                        epoch_accuracy = round((epoch_correct / current_ep) * 100, 3)
                         epoch_correct = 0
                         current_ep = 1
                     # Validating at the end of each epoch
@@ -229,6 +230,11 @@ if __name__ == '__main__':
                                                      ca=round(avg_class_attempt, 2),
                                                      ma=round(avg_mov_attempt, 2)))
                             sys.stdout.flush()
-                        f.write('%d, %f, %f, %f\n' % (old_episodes+episode, round(avg_reward, 3),
-                                                      round((correct / i)*100, 2), round(avg_class_attempt, 2)))
+                        f.write('%d, %f, %f, %f, %f\n' % (old_episodes+episode, round(avg_reward, 3),
+                                                          round((correct / i)*100, 2), round(avg_class_attempt, 2),
+                                                          epoch_accuracy))
+                        # Shuffling data at each epoch
+                        train_images, train_labels = shuffle_data(dataset=train_images, labels=train_labels)
+                        valid_images, valid_labels = shuffle_data(dataset=valid_images, labels=valid_labels)
+                        test_images, test_labels = shuffle_data(dataset=test_images, labels=test_labels)
                         print('\n')
