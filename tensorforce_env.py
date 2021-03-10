@@ -43,10 +43,10 @@ class DyadicConvnetGymEnv(gym.Env):
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })"""
-        self.num_actions = len(self.ground_truth) #+ len(self.actions)
+        self.num_actions = len(self.ground_truth) + len(self.actions)
         self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(78,), dtype=np.float32)
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(83,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
@@ -67,12 +67,11 @@ class DyadicConvnetGymEnv(gym.Env):
     def step(self, action):
         self.step_count += 1
         done = False
-        forced_move = False
         self.class_reward = 0.0
         self.mov_reward = 0.0
         old_pos = self.agent_pos
         # New agent position based on the movement action
-        """if action == self.actions.down:
+        if action == self.actions.down:
             if self.agent_pos[0] < len(self.features) - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
@@ -98,10 +97,10 @@ class DyadicConvnetGymEnv(gym.Env):
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
         # If agent classifies well, end the episode
-        else:"""
-        self.class_reward = 1.0 if action == self.image_class else -self.class_penalty
-        if action == self.image_class:
-            done = True
+        else:
+            self.class_reward = 2.0 if action == self.image_class else -self.class_penalty
+            if action == self.image_class:
+                done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
@@ -110,18 +109,17 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.step_count >= self.max_steps:
             done = True
 
-        # Can't blame/reward the agent for what it was forced to do
-        """if not forced_move:
-            # Punishing the agent for illegal actions
-            if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                              self.actions.up_top_left, self.actions.up_bottom_left]:
-                self.mov_reward = -0.5
-            elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
-                self.mov_reward = -0.5
-            else:
-                self.mov_reward = 0.0"""
+        # Punishing the agent for illegal actions
+        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                          self.actions.up_top_left, self.actions.up_bottom_left]:
+            self.mov_reward = -0.5
+        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
+            self.mov_reward = -0.5
+        else:
+            self.mov_reward = 0.0
 
-        # Negative reward - 0.001 for each timestep (later!)
+        # Negative reward - 0.01 for each timestep
+        self.mov_reward -= 0.01
         reward = self.class_reward + self.mov_reward
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
         self.last_reward = [reward]
@@ -144,15 +142,13 @@ class DyadicConvnetGymEnv(gym.Env):
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
-        starting_layer = 4
+        starting_layer = 0
         starting_x = 0
         starting_y = 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
-        # No need to re-initialize self.last_reward since it is already set to last value
+        self.last_reward = [0.0]
         if self.last_action is None:
             self.one_hot_action = [0.0 for x in range(self.num_actions)]
-        else:
-            self.one_hot_action = [1.0 if x == self.last_action else 0.0 for x in range(self.num_actions)]
         self.step_count = 0
         obs = self.gen_obs()
         if self.visualize:

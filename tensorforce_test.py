@@ -26,9 +26,9 @@ if __name__ == '__main__':
         policy_lr = 1e-3
         baseline_lr = 1e-2
         e_r = 0.05
-        class_penalty = 0.5
+        class_penalty = 0.3
         # Control parameters
-        visualize = False
+        visualize = True
         # Train/test parameters
         num_epochs = 1
         ########################### PREPROCESSING ##############################
@@ -54,15 +54,15 @@ if __name__ == '__main__':
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             features=dict(type=float, shape=(67,)),
+                                             features=dict(type=float, shape=(78,)),
                                          ),
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210226-140541']
+        dirs = ['models/RL/20210309-100427']
         for directory in dirs:
             print('Testing {dir}'.format(dir=directory))
-            old_episodes = 240000
+            old_episodes = 200000
             print('Loading checkpoint. Last episode: %d' % old_episodes)
             agent = Agent.load(directory=directory,
                                filename='agent-{x}'.format(x=old_episodes),
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                                tracking=['distribution'],
                                discount=discount,
                                states=dict(
-                                   features=dict(type=float, shape=(67,)),
+                                   features=dict(type=float, shape=(78,)),
                                ),
                                actions=dict(type=int, num_values=num_actions+num_classes),
                                entropy_regularization=e_r
