@@ -81,7 +81,6 @@ if __name__ == '__main__':
             num_episodes = len(train_labels)
             num_images = len(train_labels)
             len_valid = len(valid_labels)
-            print('Current classification penalty term: {x}'.format(x=cp))
             # Training environment initialization
             environment = DyadicConvnetGymEnv(dataset=train_images,
                                               labels=train_labels,
