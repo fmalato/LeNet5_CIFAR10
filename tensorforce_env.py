@@ -1,6 +1,5 @@
 import numpy as np
 import gym
-import tensorflow as tf
 
 from enum import IntEnum
 from gym import spaces
@@ -19,13 +18,14 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 13
         up_bottom_right = 14
 
-    def __init__(self, network, dataset, labels, max_steps, visualize=False, tile_width=10, num_layers=5,
+    def __init__(self, dataset, images, labels, distributions, max_steps, visualize=False, tile_width=10, num_layers=5,
                  class_penalty=0.1):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
-        self.network = network
         self.dataset = dataset
+        self.images = images
         self.labels = labels
+        self.distributions = distributions
         self.dataset_length = len(self.dataset)
         self.num_layers = num_layers
         # Extracting current training image from dataset
@@ -130,13 +130,10 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def reset(self):
         # New image extraction
-        self.train_image = self.dataset[self.episodes_count]
+        self.features = self.dataset[self.episodes_count]
+        self.train_image = self.images[self.episodes_count]
         self.image_class = int(self.labels[self.episodes_count])
-        # CNN representation of the extracted image
-        image_4dim = np.reshape(self.train_image, (1, 32, 32, 3))
-        self.features = self.network.extract_features(image_4dim)
-        # CNN distribution over selected image
-        self.distribution = np.reshape(self.network(image_4dim).numpy(), (10,))
+        self.distribution = self.distributions[self.episodes_count]
         # Ground truth from CIFAR10
         self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
         # Go to next index

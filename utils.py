@@ -147,12 +147,16 @@ def split_dataset(dataset, labels, ratio=0.8):
     return dataset[:splitting_index], dataset[splitting_index:], labels[:splitting_index], labels[splitting_index:]
 
 
-def shuffle_data(dataset, labels):
+def shuffle_data(dataset, labels, distributions, RGB_imgs):
     shuffled_data = []
     shuffled_labels = []
+    shuffled_distributions = []
+    shuffled_RGB = []
     perm = np.random.permutation(len(dataset))
     for i in range(len(dataset)):
         shuffled_data.append(dataset[perm[i]])
         shuffled_labels.append(labels[perm[i]])
+        shuffled_distributions.append(distributions[perm[i]])
+        shuffled_RGB.append(RGB_imgs[perm[i]])
 
-    return np.array(shuffled_data), np.array(shuffled_labels)
+    return np.array(shuffled_data), np.array(shuffled_labels), np.array(shuffled_distributions), np.array(shuffled_RGB)
