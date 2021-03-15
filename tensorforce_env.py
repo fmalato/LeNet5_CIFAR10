@@ -111,12 +111,12 @@ class DyadicConvnetGymEnv(gym.Env):
                 done = True
                 # The fastest the classification, the higher the reward
                 self.class_reward += self.fast_class_bonus*(self.max_steps - self.step_count)
-                self.class_reward += 0.05*(np.max(self.agent_classification[:10]) - self.distribution[self.image_class])
+                self.class_reward += 1.5*(np.max(self.agent_classification[:10]) - self.distribution[self.image_class])
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
-                               predicted=action if action < 10 else None, first_step=False)
+                               predicted=action if int(action) < 10 else None, first_step=False)
         if self.step_count >= self.max_steps:
             done = True
 
@@ -129,7 +129,7 @@ class DyadicConvnetGymEnv(gym.Env):
         else:
             self.mov_reward = 0.0
         # If agent classifies well but stays in the same position it's ok, while if classification is wrong, it is encouraged to move
-        if self.agent_pos == old_pos:
+        if self.agent_pos == old_pos and action != self.image_class:
             self.mov_reward -= self.same_position
 
         # Negative reward - 0.01 for each timestep
@@ -153,13 +153,13 @@ class DyadicConvnetGymEnv(gym.Env):
             self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
         else:
             # We don't give any hint on correct class if testing, but input must be of the same size
-            self.ground_truth = [0.0 for i in range(10)]
+            self.ground_truth = [0.1 for i in range(10)]
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
-        starting_layer = 0
-        starting_x = 0
-        starting_y = 0
+        starting_layer = np.random.randint(0, self.num_layers - 1)
+        starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
+        starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
         self.last_reward = [0.0]
         self.one_hot_action = [0.0 for x in range(self.num_actions)]

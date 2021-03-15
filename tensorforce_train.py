@@ -28,7 +28,7 @@ if __name__ == '__main__':
         steps_per_episode = 15
         policy_lr = 1e-3
         baseline_lr = 1e-2
-        e_r = 0.15
+        e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
         class_penalty = 0.15
@@ -39,9 +39,9 @@ if __name__ == '__main__':
         fast_class_bonus = 0.02
         # Control parameters
         visualize = False
-        load_checkpoint = False
+        load_checkpoint = True
         # Train/test parameters
-        num_epochs = 20
+        num_epochs = 250
         images_per_class = 50
         parameters = [batch_size, sampling_ratio, discount, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
@@ -141,11 +141,11 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210226-140541'
-            old_episodes = 200000
-            print('Loading checkpoint. Last episode: %d' % old_episodes)
+            directory = 'models/RL/20210315-164022'
+            old_epochs = 150
+            print('Loading checkpoint. NUmerb of old epochs: %d' % old_epochs)
             agent = Agent.load(directory=directory,
-                               filename='agent-{x}'.format(x=old_episodes),
+                               filename='agent',
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -173,7 +173,7 @@ if __name__ == '__main__':
                                entropy_regularization=e_r
                                )
         else:
-            old_episodes = 0
+            old_epochs = 0
             agent = Agent.create(environment=environment,
                                  agent='ppo',
                                  max_episode_timesteps=steps_per_episode,
@@ -207,7 +207,7 @@ if __name__ == '__main__':
         # Where to store checkpoints
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         if load_checkpoint:
-            save_dir = directory
+            save_dir = directory + "/"
         else:
             save_dir = 'models/RL/{x}/'.format(x=current_time)
         if not load_checkpoint and (save_dir not in os.listdir('models/RL/')):
@@ -241,8 +241,8 @@ if __name__ == '__main__':
                     first_step = False
                     current_ep += 1
                 # Stats for current episode
-                sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch,
-                                                                                                                     ep=episode + old_episodes,
+                sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch + old_epochs,
+                                                                                                                     ep=episode,
                                                                                                                      cr=round(cum_reward, 3),
                                                                                                                      ec=round((epoch_correct / current_ep)*100, 3)
                                                                                                                      ))
@@ -251,7 +251,7 @@ if __name__ == '__main__':
                 # Saving model at the end of each epoch
                 if episode % num_images == 0:
                     agent.save(directory=save_dir,
-                               filename='agent',
+                               filename='agent-2',
                                format='hdf5')
                     # Reset correct and episode count
                     epoch_accuracy = round((epoch_correct / current_ep) * 100, 2)
@@ -272,7 +272,7 @@ if __name__ == '__main__':
                         internals_valid = agent.initial_internals()
                         while not terminal:
                             action, internals_valid = agent.act(states=dict(features=state['features']), internals=internals_valid,
-                                                          independent=True, deterministic=True)
+                                                                independent=True, deterministic=True)
                             valid_environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
                             state, terminal, reward = valid_environment.execute(actions=action)
                             if terminal:
@@ -295,7 +295,7 @@ if __name__ == '__main__':
                                                  ma=round(avg_mov_attempt, 2)))
                         sys.stdout.flush()
                     # At the end of each epoch, write a new line with current data on the excel sheet
-                    sheet.write(epoch + 1, 0, str(epoch), data_style)
+                    sheet.write(epoch + 1, 0, str(epoch+old_epochs), data_style)
                     sheet.write(epoch + 1, 1, str(round(avg_reward, 3)), data_style)
                     sheet.write(epoch + 1, 2, str(epoch_accuracy) + "%", data_style)
                     sheet.write(epoch + 1, 3, str(round((correct / i)*100, 2)) + "%", data_style)

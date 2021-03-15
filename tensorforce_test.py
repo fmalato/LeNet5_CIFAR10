@@ -26,18 +26,17 @@ if __name__ == '__main__':
         steps_per_episode = 15
         policy_lr = 1e-3
         baseline_lr = 1e-2
-        e_r = 0.15
+        e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
         class_penalty = 0.15
         correct_class = 2.0
         illegal_mov = 0.25
-        same_position = 0.1
+        same_position = 0.05
         timestep_passed = 0.01
         fast_class_bonus = 0.02
         # Control parameters
         visualize = False
-        load_checkpoint = False
         # Train/test parameters
         num_epochs = 1
         images_per_class = 50
@@ -90,7 +89,7 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210315-092741']
+        dirs = ['models/RL/20210315-164022']
         for directory in dirs:
             print('Testing {dir}'.format(dir=directory))
             old_episodes = 200000
