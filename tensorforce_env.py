@@ -106,7 +106,7 @@ class DyadicConvnetGymEnv(gym.Env):
                                   2*self.agent_pos[2] + 1)
         # If agent classifies well, end the episode
         else:
-            self.class_reward = np.max(self.agent_classification[:10]) if action == self.image_class else -self.class_penalty
+            self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
             if action == self.image_class:
                 done = True
                 # The fastest the classification, the higher the reward
