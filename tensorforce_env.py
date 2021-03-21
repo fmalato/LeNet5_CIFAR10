@@ -19,8 +19,7 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_right = 14
 
     def __init__(self, dataset, images, labels, distributions, max_steps, visualize=False, testing=False, tile_width=10,
-                 num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01,
-                 timestep_passed=0.01, fast_class_bonus=0.02):
+                 num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.dataset = dataset
@@ -36,15 +35,13 @@ class DyadicConvnetGymEnv(gym.Env):
         self.features = None
         # CNN distribution over selected image
         self.distribution = None
-        # Ground truth from CIFAR10
-        self.ground_truth = range(10)
         # Will need this for computing the reward
         self.actions = DyadicConvnetGymEnv.Actions
         # Single action space
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })"""
-        self.num_actions = len(self.ground_truth) + len(self.actions)
+        self.num_actions = len(distributions[0]) + len(self.actions)
         self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
         self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(147,), dtype=np.float32)
@@ -65,8 +62,6 @@ class DyadicConvnetGymEnv(gym.Env):
         self.correct_class = correct_class
         self.illegal_mov = illegal_mov
         self.same_position = same_position
-        self.timestep_passed = timestep_passed
-        self.fast_class_bonus = fast_class_bonus
         # Drawing
         self.visualize = visualize
         self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=self.num_layers, pos=(0, 0, 0)) if self.visualize else None
@@ -80,7 +75,7 @@ class DyadicConvnetGymEnv(gym.Env):
         old_pos = self.agent_pos
         # New agent position based on the movement action
         if action == self.actions.down:
-            if self.agent_pos[0] < len(self.features) - 1:
+            if self.agent_pos[0] < self.num_layers - 1:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
                                   int(self.agent_pos[2]/2))
@@ -106,12 +101,10 @@ class DyadicConvnetGymEnv(gym.Env):
                                   2*self.agent_pos[2] + 1)
         # If agent classifies well, end the episode
         else:
-            self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
-            if action == self.image_class:
-                done = True
-                # The fastest the classification, the higher the reward
-                self.class_reward += self.fast_class_bonus*(self.max_steps - self.step_count)
-                self.class_reward += 1.5*(np.max(self.agent_classification[:10]) - self.distribution[self.image_class])
+            self.class_reward = self.correct_class + (0.2 * self.step_count) if action == self.image_class else -self.class_penalty
+            """if action == self.image_class:
+                done = True"""
+            done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
@@ -119,12 +112,15 @@ class DyadicConvnetGymEnv(gym.Env):
                                predicted=action if int(action) < 10 else None, first_step=False)
         if self.step_count >= self.max_steps:
             done = True
+            if action >= 10:
+                # Agent should at least attempt to classify once per episode
+                self.class_reward -= 5.0
 
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
                                           self.actions.up_top_left, self.actions.up_bottom_left]:
             self.mov_reward = -self.illegal_mov
-        elif old_pos[0] == len(self.features) - 1 and action == self.actions.down:
+        elif old_pos[0] == self.num_layers - 1 and action == self.actions.down:
             self.mov_reward = -self.illegal_mov
         else:
             self.mov_reward = 0.0
@@ -132,9 +128,8 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.agent_pos == old_pos and action != self.image_class:
             self.mov_reward -= self.same_position
 
-        # Negative reward - 0.01 for each timestep
-        self.mov_reward -= self.timestep_passed
         reward = self.class_reward + self.mov_reward
+        # Adjusting parameters for new observation
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
         self.last_reward = [reward]
         self.last_action = action
@@ -148,12 +143,6 @@ class DyadicConvnetGymEnv(gym.Env):
         self.train_image = self.images[self.episodes_count]
         self.image_class = int(self.labels[self.episodes_count])
         self.distribution = self.distributions[self.episodes_count]
-        # Ground truth from CIFAR10
-        if not self.testing:
-            self.ground_truth = [1 if i == self.image_class else 0 for i in range(10)]
-        else:
-            # We don't give any hint on correct class if testing, but input must be of the same size
-            self.ground_truth = [0.1 for i in range(10)]
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)

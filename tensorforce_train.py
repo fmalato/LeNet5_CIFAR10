@@ -3,6 +3,7 @@ import sys
 import datetime
 import xlwt
 import copy
+import json
 
 import numpy as np
 import tensorflow as tf
@@ -16,7 +17,7 @@ from utils import split_dataset, n_images_per_class, shuffle_data
 
 
 if __name__ == '__main__':
-    with tf.device('/device:CPU:0'):
+    with tf.device('/device:GPU:0'):
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
@@ -26,7 +27,7 @@ if __name__ == '__main__':
         num_classes = 10
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-3
+        policy_lr = 5e-4
         baseline_lr = 1e-2
         e_r = 0.2
         split_ratio = 0.8
@@ -35,21 +36,18 @@ if __name__ == '__main__':
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
-        timestep_passed = 0.01
-        fast_class_bonus = 0.02
         # Control parameters
         visualize = False
-        load_checkpoint = True
+        load_checkpoint = False
         # Train/test parameters
-        num_epochs = 250
+        num_epochs = 50
         images_per_class = 50
         parameters = [batch_size, sampling_ratio, discount, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
-                      timestep_passed, fast_class_bonus, images_per_class]
+                      images_per_class]
         parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM horizon', 'Steps per Episode',
                             'Policy lr', 'Baseline lr', 'Entropy Reg', 'Dataset Split Ratio', 'Class Penalty',
-                            'Correct Classification', 'Illegal Move', 'Same Position', 'Timestep Passed',
-                            'Fast Classification Bonus', 'Images per Class']
+                            'Correct Classification', 'Illegal Move', 'Same Position', 'Images per Class']
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -103,9 +101,7 @@ if __name__ == '__main__':
                                           class_penalty=class_penalty,
                                           correct_class=correct_class,
                                           illegal_mov=illegal_mov,
-                                          same_position=same_position,
-                                          timestep_passed=timestep_passed,
-                                          fast_class_bonus=fast_class_bonus
+                                          same_position=same_position
                                           )
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
@@ -127,9 +123,7 @@ if __name__ == '__main__':
                                                 class_penalty=class_penalty,
                                                 correct_class=correct_class,
                                                 illegal_mov=illegal_mov,
-                                                same_position=same_position,
-                                                timestep_passed=timestep_passed,
-                                                fast_class_bonus=fast_class_bonus
+                                                same_position=same_position
                                                 )
         num_actions = len(valid_environment.actions)
         valid_environment = Environment.create(environment=valid_environment,
@@ -141,11 +135,11 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210315-164022'
-            old_epochs = 150
-            print('Loading checkpoint. NUmerb of old epochs: %d' % old_epochs)
+            directory = 'models/RL/20210316-115334'
+            old_epochs = 40
+            print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = Agent.load(directory=directory,
-                               filename='agent',
+                               filename='agent{oe}'.format(oe=old_epochs),
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
@@ -170,7 +164,7 @@ if __name__ == '__main__':
                                    features=dict(type=float, shape=(147,)),
                                ),
                                actions=dict(type=int, num_values=num_actions+num_classes),
-                               entropy_regularization=e_r
+                               entropy_regularization=0.01
                                )
         else:
             old_epochs = 0
@@ -197,11 +191,12 @@ if __name__ == '__main__':
                                      features=dict(type=float, shape=(147,)),
                                  ),
                                  actions=dict(type=int, num_values=num_actions+num_classes),
-                                 entropy_regularization=e_r
+                                 entropy_regularization=dict(
+                                        type='linear', unit='episodes', num_steps=num_images*num_epochs/2,
+                                        initial_value=e_r, final_value=0.01
+                                        )
                                  )
         # Parameters for training loop
-        first_time = True
-        episode = 0
         epoch_correct = 0
         current_ep = 0
         # Where to store checkpoints
@@ -210,8 +205,12 @@ if __name__ == '__main__':
             save_dir = directory + "/"
         else:
             save_dir = 'models/RL/{x}/'.format(x=current_time)
+            checkpoints_dir = save_dir + 'checkpoints/'
+            stats_dir = save_dir + 'stats/'
         if not load_checkpoint and (save_dir not in os.listdir('models/RL/')):
             os.mkdir(save_dir)
+            os.mkdir(checkpoints_dir)
+            os.mkdir(stats_dir)
         # Initialization of excel sheet with relevant stats
         xl_sheet = xlwt.Workbook()
         sheet = xl_sheet.add_sheet(current_time)
@@ -219,15 +218,18 @@ if __name__ == '__main__':
         data_style = xlwt.easyxf('align: horiz center; borders: left thin, right thin, top thin, bottom thin;')
         # Making first column for the sake of readability
         stat_names = ['Epoch', 'Average Reward', 'Epoch Accuracy', 'Valid Accuracy', 'Avg.Class', 'Avg.Move']
+        class_terminal_hist = {}
         for col, name in zip(range(len(stat_names)), stat_names):
             sheet.write(0, col, name, title_style)
-        # Train/test loop
+        # Train/validation loop
         for epoch in range(num_epochs):
+            # Initializing histrogram for current epoch
+            class_terminal_hist[epoch] = list(np.zeros(steps_per_episode))
+            terminal_hist = list(np.zeros(steps_per_episode))
             for episode in range(num_episodes):
                 state = environment.reset()
                 cum_reward = 0.0
                 terminal = False
-                first_step = True
                 # Episode loop
                 while not terminal:
                     action = agent.act(states=dict(features=state['features']), deterministic=False)
@@ -238,7 +240,6 @@ if __name__ == '__main__':
                         if action == train_labels[episode]:
                             epoch_correct += 1
                     cum_reward += reward
-                    first_step = False
                     current_ep += 1
                 # Stats for current episode
                 sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch + old_epochs,
@@ -247,79 +248,83 @@ if __name__ == '__main__':
                                                                                                                      ec=round((epoch_correct / current_ep)*100, 3)
                                                                                                                      ))
                 sys.stdout.flush()
-                episode += 1
-                # Saving model at the end of each epoch
-                if episode % num_images == 0:
-                    agent.save(directory=save_dir,
-                               filename='agent-2',
-                               format='hdf5')
-                    # Reset correct and episode count
-                    epoch_accuracy = round((epoch_correct / current_ep) * 100, 2)
-                    epoch_correct = 0
-                    current_ep = 1
-                # Validating at the end of each epoch
-                if episode % num_images == 0:
-                    print('\n')
-                    rewards = []
-                    correct = 0
-                    class_attempt = 0
-                    mov_attempt = 0
-                    valid_environment.environment.episodes_count = 0
-                    for i in range(1, len_valid + 1):
-                        terminal = False
-                        ep_reward = 0
-                        state = valid_environment.reset()
-                        internals_valid = agent.initial_internals()
-                        while not terminal:
-                            action, internals_valid = agent.act(states=dict(features=state['features']), internals=internals_valid,
-                                                                independent=True, deterministic=True)
-                            valid_environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
-                            state, terminal, reward = valid_environment.execute(actions=action)
-                            if terminal:
-                                if action == valid_labels[i-1]:
-                                    correct += 1
-                            ep_reward += reward
-                            if int(action) < 10:
-                                class_attempt += 1
-                            else:
-                                mov_attempt += 1
-                        rewards.append(ep_reward)
-                        # Computing stats in real time
-                        avg_reward = np.sum(rewards) / len(rewards)
-                        avg_class_attempt = class_attempt / i
-                        avg_mov_attempt = mov_attempt / i
-                        sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}% - Avg. Classification Moves: {ca} - Avg. Movement Moves: {ma}'
-                                         .format(ep=i, cr=round(avg_reward, 3),
-                                                 ok=round((correct / i)*100, 2),
-                                                 ca=round(avg_class_attempt, 2),
-                                                 ma=round(avg_mov_attempt, 2)))
-                        sys.stdout.flush()
-                    # At the end of each epoch, write a new line with current data on the excel sheet
-                    sheet.write(epoch + 1, 0, str(epoch+old_epochs), data_style)
-                    sheet.write(epoch + 1, 1, str(round(avg_reward, 3)), data_style)
-                    sheet.write(epoch + 1, 2, str(epoch_accuracy) + "%", data_style)
-                    sheet.write(epoch + 1, 3, str(round((correct / i)*100, 2)) + "%", data_style)
-                    sheet.write(epoch + 1, 4, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
-                    sheet.write(epoch + 1, 5, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
-                    # Shuffling data at each epoch
-                    train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images,
-                                                                                             labels=train_labels,
-                                                                                             distributions=train_distrib,
-                                                                                             RGB_imgs=train_RGB_imgs)
-                    valid_images, valid_labels, valid_distrib, valid_RGB_imgs = shuffle_data(dataset=valid_images,
-                                                                                             labels=valid_labels,
-                                                                                             distributions=valid_distrib,
-                                                                                             RGB_imgs=valid_RGB_imgs)
-                    # Setting new permutation of data on envs
-                    environment.environment.dataset = train_images
-                    environment.environment.labels = train_labels
-                    environment.environment.distributions = train_distrib
-                    environment.environment.images = train_RGB_imgs
-                    valid_environment.environment.dataset = valid_images
-                    valid_environment.environment.labels = valid_labels
-                    valid_environment.environment.distributions = valid_distrib
-                    valid_environment.environment.images = valid_RGB_imgs
-                    print('\n')
+            agent.save(directory=checkpoints_dir,
+                       filename='agent-{e}'.format(e=epoch+old_epochs),
+                       format='hdf5')
+            # Reset correct and episode count
+            epoch_accuracy = round((epoch_correct / current_ep) * 100, 2)
+            epoch_correct = 0
+            current_ep = 1
+            # Validating at the end of each epoch
+            print('\n')
+            rewards = []
+            correct = 0
+            class_attempt = 0
+            mov_attempt = 0
+            valid_environment.environment.episodes_count = 0
+            for i in range(1, len_valid + 1):
+                terminal = False
+                ep_reward = 0
+                state = valid_environment.reset()
+                current_ep_num_steps = 0
+                internals_valid = agent.initial_internals()
+                while not terminal:
+                    action, internals_valid = agent.act(states=dict(features=state['features']), internals=internals_valid,
+                                                        independent=True, deterministic=True)
+                    valid_environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
+                    state, terminal, reward = valid_environment.execute(actions=action)
+                    if terminal:
+                        if action == valid_labels[i-1]:
+                            correct += 1
+                            class_terminal_hist[epoch][current_ep_num_steps] += 1
+                    ep_reward += reward
+                    if int(action) < 10:
+                        # Add a classification attempt at timestep t
+                        terminal_hist[current_ep_num_steps] += 1
+                        # Add a classification attempt
+                        class_attempt += 1
+                    else:
+                        mov_attempt += 1
+                    current_ep_num_steps += 1
+                rewards.append(ep_reward)
+                # Computing stats in real time
+                avg_reward = np.sum(rewards) / len(rewards)
+                avg_class_attempt = class_attempt / i
+                avg_mov_attempt = mov_attempt / i
+                sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}% - Avg. Classification Moves: {ca} - Avg. Movement Moves: {ma}'
+                                 .format(ep=i, cr=round(avg_reward, 3),
+                                         ok=round((correct / i)*100, 2),
+                                         ca=round(avg_class_attempt, 2),
+                                         ma=round(avg_mov_attempt, 2)))
+                sys.stdout.flush()
+            # Compute timestep-by-timestep accuracy - #{correct class at timestep t} / #{total class at timestep t}
+            class_terminal_hist[epoch] = [x / y for x, y in zip(class_terminal_hist[epoch], terminal_hist)]
+            # At the end of each epoch, write a new line with current data on the excel sheet
+            sheet.write(epoch + 1, 0, str(epoch+old_epochs), data_style)
+            sheet.write(epoch + 1, 1, str(round(avg_reward, 3)), data_style)
+            sheet.write(epoch + 1, 2, str(epoch_accuracy) + "%", data_style)
+            sheet.write(epoch + 1, 3, str(round((correct / i)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 4, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 5, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            # Shuffling data at each epoch
+            train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images,
+                                                                                     labels=train_labels,
+                                                                                     distributions=train_distrib,
+                                                                                     RGB_imgs=train_RGB_imgs)
+            valid_images, valid_labels, valid_distrib, valid_RGB_imgs = shuffle_data(dataset=valid_images,
+                                                                                     labels=valid_labels,
+                                                                                     distributions=valid_distrib,
+                                                                                     RGB_imgs=valid_RGB_imgs)
+            # Setting new permutation of data on envs
+            environment.environment.dataset = train_images
+            environment.environment.labels = train_labels
+            environment.environment.distributions = train_distrib
+            environment.environment.images = train_RGB_imgs
+            valid_environment.environment.dataset = valid_images
+            valid_environment.environment.labels = valid_labels
+            valid_environment.environment.distributions = valid_distrib
+            valid_environment.environment.images = valid_RGB_imgs
+            print('\n')
         # Save excel sheet at the end of training
         idx = 3
         params_column = len(stat_names) + 2
@@ -327,4 +332,6 @@ if __name__ == '__main__':
             sheet.write(idx, params_column, name, title_style)
             sheet.write(idx, params_column + 1, value, data_style)
             idx += 1
-        xl_sheet.save(save_dir + current_time + ".xlsx")
+        xl_sheet.save(stats_dir + current_time + ".xlsx")
+        with open(stats_dir + 'epochs_hist.json', 'w+') as f:
+            json.dump(class_terminal_hist, f)

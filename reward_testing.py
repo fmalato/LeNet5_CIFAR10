@@ -33,7 +33,7 @@ if __name__ == '__main__':
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
-        visualize = True
+        visualize = False
         # Train/test parameters
         num_epochs = 1
         images_per_class = 50
@@ -84,57 +84,25 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210320-100559']
-        for directory in dirs:
-            check_dir = directory + '/checkpoints/'
-            print('Testing {dir}'.format(dir=directory))
-            old_epochs = 100
-            agent = Agent.load(directory=check_dir,
-                               filename='agent-{oe}'.format(oe=old_epochs-1),
-                               format='hdf5',
-                               environment=environment,
-                               agent='ppo',
-                               network=[
-                                       dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
-                               ],
-                               baseline=[
-                                   dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
-                               ],
-                               baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
-                               learning_rate=policy_lr,
-                               batch_size=batch_size,
-                               tracking=['distribution'],
-                               discount=discount,
-                               states=dict(
-                                   features=dict(type=float, shape=(147,)),
-                               ),
-                               actions=dict(type=int, num_values=num_actions+num_classes),
-                               entropy_regularization=e_r
-                               )
-            # Parameters for test loop
-            episode = 0
-            correct = 0
-            rewards = []
-            num_images = len(test_labels)
-            # Test loop
-            for i in range(1, len(test_labels) + 1):
-                terminal = False
-                ep_reward = 0
-                state = environment.reset()
-                internals = agent.initial_internals()
-                while not terminal:
-                    action, internals = agent.act(states=dict(features=state['features']), internals=internals,
-                                                  independent=True, deterministic=True)
-                    environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
-                    state, terminal, reward = environment.execute(actions=action)
-                    if terminal:
-                        if action == test_labels[i - 1]:
-                            correct += 1
-                    ep_reward += reward
-                rewards.append(ep_reward)
-                avg_reward = np.sum(rewards) / len(rewards)
-                sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i,
-                                                                                                       cr=round(avg_reward, 3),
-                                                                                                       ok=round((correct / i) * 100, 2)))
-                sys.stdout.flush()
-            print('\n')
+
+        # Parameters for test loop
+        episode = 0
+        correct = 0
+        rewards = []
+        num_images = len(test_labels)
+        # Test loop
+        for i in range(1, len(test_labels) + 1):
+            terminal = False
+            ep_reward = 0
+            state = environment.reset()
+            while not terminal:
+                action = int(input("(Correct class: {cc}) Select action: ".format(cc=test_labels[i - 1])))
+                state, terminal, reward = environment.execute(actions=action)
+                print("Step reward: {rew} - Current position: {pos}".format(rew=round(reward, 3), pos=environment.environment.agent_pos))
+                if terminal:
+                    if action == test_labels[i - 1]:
+                        correct += 1
+                ep_reward += reward
+            sys.stdout.write('\rEpisode reward: {ep_rew}\n'.format(ep_rew=ep_reward))
+            sys.stdout.flush()
+        print('\n')
