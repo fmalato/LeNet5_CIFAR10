@@ -33,7 +33,7 @@ if __name__ == '__main__':
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
-        visualize = True
+        visualize = False
         # Train/test parameters
         num_epochs = 1
         images_per_class = 50
@@ -84,11 +84,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210323-112649']
+        dirs = ['models/RL/20210324-163224']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('Testing {dir}'.format(dir=directory))
-            old_epochs = 43
+            old_epochs = 50
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',

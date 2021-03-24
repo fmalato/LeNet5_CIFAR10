@@ -17,7 +17,7 @@ from utils import split_dataset, n_images_per_class, shuffle_data
 
 
 if __name__ == '__main__':
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:CPU:0'):
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
@@ -26,6 +26,7 @@ if __name__ == '__main__':
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
+        lstm_units = 64
         steps_per_episode = 15
         policy_lr = 1e-3
         baseline_lr = 1e-2
@@ -40,12 +41,12 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = False
         # Train/test parameters
-        num_epochs = 100
+        num_epochs = 50
         images_per_class = 50
-        parameters = [batch_size, sampling_ratio, discount, lstm_horizon, steps_per_episode, policy_lr,
+        parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
                       images_per_class]
-        parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM horizon', 'Steps per Episode',
+        parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM Units', 'LSTM horizon', 'Steps per Episode',
                             'Policy lr', 'Baseline lr', 'Entropy Reg', 'Dataset Split Ratio', 'Class Penalty',
                             'Correct Classification', 'Illegal Move', 'Same Position', 'Images per Class']
         ########################### PREPROCESSING ##############################
@@ -135,20 +136,20 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210316-115334'
-            old_epochs = 52
+            directory = 'models/RL/20210323-180527'
+            old_epochs = 50
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
-            agent = Agent.load(directory=directory,
+            agent = Agent.load(directory=directory + '/checkpoints/',
                                filename='agent{oe}'.format(oe=old_epochs),
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
                                max_episode_timesteps=steps_per_episode,
                                network=[
-                                       dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
+                                       dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
                                ],
                                baseline=[
-                                   dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
+                                   dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                # TODO: Huge file - find minimum number of parameters
@@ -164,7 +165,7 @@ if __name__ == '__main__':
                                    features=dict(type=float, shape=(147,)),
                                ),
                                actions=dict(type=int, num_values=num_actions+num_classes),
-                               entropy_regularization=0.01
+                               entropy_regularization=e_r
                                )
         else:
             old_epochs = 0
@@ -172,10 +173,10 @@ if __name__ == '__main__':
                                  agent='ppo',
                                  max_episode_timesteps=steps_per_episode,
                                  network=[
-                                     dict(type='lstm', size=128, horizon=lstm_horizon, activation='relu'),
+                                     dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
                                  ],
                                  baseline=[
-                                     dict(type='lstm', size=128, horizon=lstm_horizon, activation='relu')
+                                     dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
                                  ],
                                  baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                  # TODO: Huge file - find minimum number of parameters
@@ -191,10 +192,7 @@ if __name__ == '__main__':
                                      features=dict(type=float, shape=(147,)),
                                  ),
                                  actions=dict(type=int, num_values=num_actions+num_classes),
-                                 entropy_regularization=dict(
-                                        type='linear', unit='episodes', num_steps=num_images*num_epochs/2,
-                                        initial_value=e_r, final_value=0.01
-                                        )
+                                 entropy_regularization=e_r
                                  )
         # Parameters for training loop
         epoch_correct = 0
@@ -217,20 +215,22 @@ if __name__ == '__main__':
         title_style = xlwt.easyxf('font: bold on; align: horiz center; pattern: pattern solid, fore_colour orange; borders: left thin, right thin, top thin, bottom thin;')
         data_style = xlwt.easyxf('align: horiz center; borders: left thin, right thin, top thin, bottom thin;')
         # Making first column for the sake of readability
-        stat_names = ['Epoch', 'Average Reward', 'Epoch Accuracy', 'RCA Accuracy', 'Valid Accuracy', 'Avg.Class', 'Avg.Move']
-        class_terminal_hist = {}
+        stat_names = ['Epoch', 'Train Avg Reward', 'Epoch Accuracy', 'RCA Accuracy', 'Valid Avg Reward', 'Valid Accuracy', 'Avg.Class', 'Avg.Move']
+        cumulative_accuracy = {}
         for col, name in zip(range(len(stat_names)), stat_names):
             sheet.write(0, col, name, title_style)
         # Train/validation loop
-        for epoch in range(old_epochs+1, num_epochs):
-            # Initializing histrogram for current epoch
-            class_terminal_hist[epoch] = list(np.zeros(steps_per_episode))
+        for epoch in range(old_epochs, num_epochs):
             epoch_rewards = []
-            terminal_hist = list(np.zeros(steps_per_episode))
+            # Initializing cum accuracy vector
+            correct_class_per_timestep = list(np.zeros(steps_per_episode))
+            # Keep track of classification attempts per timestep
+            class_attempts_per_timestep = list(np.zeros(steps_per_episode))
             for episode in range(num_episodes):
                 state = environment.reset()
                 cum_reward = 0.0
                 terminal = False
+                current_step = 0
                 # Episode loop
                 while not terminal:
                     action = agent.act(states=dict(features=state['features']), deterministic=False)
@@ -241,8 +241,13 @@ if __name__ == '__main__':
                         if action == train_labels[episode]:
                             epoch_correct += 1
                     cum_reward += reward
-                    epoch_rewards.append(cum_reward)
-                    current_ep += 1
+                    if action < 10:
+                        class_attempts_per_timestep[current_step] += 1
+                        if action == environment.environment.image_class:
+                            correct_class_per_timestep[current_step] += 1
+                    current_step += 1
+                epoch_rewards.append(cum_reward)
+                current_ep += 1
                 # Stats for current episode
                 sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Avg Epoch Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch + old_epochs,
                                                                                                                     ep=episode,
@@ -254,7 +259,15 @@ if __name__ == '__main__':
                        filename='agent-{e}'.format(e=epoch+old_epochs),
                        format='hdf5')
             # Reset correct and episode count
+            cum_acc = list(np.zeros(steps_per_episode))
+            for x in range(1, steps_per_episode + 1):
+                if class_attempts_per_timestep[0] == 0:
+                    cum_acc[x - 1] = 0
+                else:
+                    cum_acc[x - 1] = round(sum(correct_class_per_timestep[:x]) / sum(class_attempts_per_timestep[:x]), 3)
+            cumulative_accuracy[epoch] = cum_acc
             epoch_accuracy = round((epoch_correct / current_ep) * 100, 2)
+            epoch_avg_reward = round(sum(epoch_rewards) / current_ep, 3)
             epoch_correct = 0
             current_ep = 0
             # Validating at the end of each epoch
@@ -268,7 +281,6 @@ if __name__ == '__main__':
                 terminal = False
                 ep_reward = 0
                 state = valid_environment.reset()
-                current_ep_num_steps = 0
                 internals_valid = agent.initial_internals()
                 while not terminal:
                     action, internals_valid = agent.act(states=dict(features=state['features']), internals=internals_valid,
@@ -278,16 +290,13 @@ if __name__ == '__main__':
                     if terminal:
                         if action == valid_labels[i-1]:
                             correct += 1
-                            class_terminal_hist[epoch][current_ep_num_steps] += 1
                     ep_reward += reward
                     if int(action) < 10:
                         # Add a classification attempt at timestep t
-                        terminal_hist[current_ep_num_steps] += 1
                         # Add a classification attempt
                         class_attempt += 1
                     else:
                         mov_attempt += 1
-                    current_ep_num_steps += 1
                 rewards.append(ep_reward)
                 # Computing stats in real time
                 avg_reward = np.sum(rewards) / len(rewards)
@@ -303,16 +312,15 @@ if __name__ == '__main__':
                                          ca=round(avg_class_attempt, 2),
                                          ma=round(avg_mov_attempt, 2)))
                 sys.stdout.flush()
-            # Compute timestep-by-timestep accuracy - #{correct class at timestep t} / #{total class at timestep t}
-            class_terminal_hist[epoch] = [x / y for x, y in zip(class_terminal_hist[epoch], terminal_hist)]
             # At the end of each epoch, write a new line with current data on the excel sheet
             sheet.write(epoch + 1, 0, str(epoch+old_epochs), data_style)
-            sheet.write(epoch + 1, 1, str(round(avg_reward, 3)), data_style)
+            sheet.write(epoch + 1, 1, str(epoch_avg_reward), data_style)
             sheet.write(epoch + 1, 2, str(epoch_accuracy) + "%", data_style)
             sheet.write(epoch + 1, 3, str(round((correct / class_attempt) * 100, 2)) + "%", data_style)
-            sheet.write(epoch + 1, 4, str(round((correct / i)*100, 2)) + "%", data_style)
-            sheet.write(epoch + 1, 5, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
-            sheet.write(epoch + 1, 6, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 4, str(round(avg_reward, 3)), data_style)
+            sheet.write(epoch + 1, 5, str(round((correct / i)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 6, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 7, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
             # Shuffling data at each epoch
             train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images,
                                                                                      labels=train_labels,
@@ -340,5 +348,15 @@ if __name__ == '__main__':
             sheet.write(idx, params_column + 1, value, data_style)
             idx += 1
         xl_sheet.save(stats_dir + current_time + ".xlsx")
-        with open(stats_dir + 'epochs_hist.json', 'w+') as f:
-            json.dump(class_terminal_hist, f)
+        xl_sheet_accuracy = xlwt.Workbook()
+        sheet_acc = xl_sheet_accuracy.add_sheet(current_time)
+        titles = ['Epoch', 'T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12', 'T13', 'T14']
+        for col, name in zip(range(len(titles)), titles):
+            sheet_acc.write(0, col, name, title_style)
+        for key in cumulative_accuracy.keys():
+            sheet_acc.write(int(key) + 1, 0, key, data_style)
+            col = 1
+            for el in cumulative_accuracy[key]:
+                sheet_acc.write(int(key) + 1, col, el, data_style)
+                col += 1
+        xl_sheet_accuracy.save(stats_dir + "cumulative_accuracy.xlsx")
