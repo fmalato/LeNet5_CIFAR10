@@ -101,9 +101,9 @@ class DyadicConvnetGymEnv(gym.Env):
                                   2*self.agent_pos[2] + 1)
         # If agent classifies well, end the episode
         else:
-            self.class_reward = self.correct_class + (0.2 * self.step_count) if action == self.image_class else -self.class_penalty
-            """if action == self.image_class:
-                done = True"""
+            # Higher reward for higher exploration, lower reward for failed exploration
+            self.class_reward = self.correct_class + (0.2 * self.step_count) if action == self.image_class else \
+                -self.class_penalty - (0.1 * self.step_count)
             done = True
 
         if self.visualize:
@@ -113,8 +113,8 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.step_count >= self.max_steps:
             done = True
             if action >= 10:
-                # Agent should at least attempt to classify once per episode
-                self.class_reward -= 5.0
+                # Agent should at least attempt to classify once per episode. -7.0 is the lowest possible reward
+                self.class_reward -= 1.0
 
         # Punishing the agent for illegal actions
         if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,

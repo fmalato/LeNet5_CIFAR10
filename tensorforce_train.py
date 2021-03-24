@@ -22,12 +22,12 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 50
-        sampling_ratio = 0.5
+        sampling_ratio = 0.99
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 5e-4
+        policy_lr = 1e-3
         baseline_lr = 1e-2
         e_r = 0.2
         split_ratio = 0.8
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = False
         # Train/test parameters
-        num_epochs = 50
+        num_epochs = 100
         images_per_class = 50
         parameters = [batch_size, sampling_ratio, discount, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
@@ -136,7 +136,7 @@ if __name__ == '__main__':
         # Agent initialization
         if load_checkpoint:
             directory = 'models/RL/20210316-115334'
-            old_epochs = 40
+            old_epochs = 52
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = Agent.load(directory=directory,
                                filename='agent{oe}'.format(oe=old_epochs),
@@ -172,10 +172,10 @@ if __name__ == '__main__':
                                  agent='ppo',
                                  max_episode_timesteps=steps_per_episode,
                                  network=[
-                                     dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
+                                     dict(type='lstm', size=128, horizon=lstm_horizon, activation='relu'),
                                  ],
                                  baseline=[
-                                     dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
+                                     dict(type='lstm', size=128, horizon=lstm_horizon, activation='relu')
                                  ],
                                  baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                  # TODO: Huge file - find minimum number of parameters
@@ -217,14 +217,15 @@ if __name__ == '__main__':
         title_style = xlwt.easyxf('font: bold on; align: horiz center; pattern: pattern solid, fore_colour orange; borders: left thin, right thin, top thin, bottom thin;')
         data_style = xlwt.easyxf('align: horiz center; borders: left thin, right thin, top thin, bottom thin;')
         # Making first column for the sake of readability
-        stat_names = ['Epoch', 'Average Reward', 'Epoch Accuracy', 'Valid Accuracy', 'Avg.Class', 'Avg.Move']
+        stat_names = ['Epoch', 'Average Reward', 'Epoch Accuracy', 'RCA Accuracy', 'Valid Accuracy', 'Avg.Class', 'Avg.Move']
         class_terminal_hist = {}
         for col, name in zip(range(len(stat_names)), stat_names):
             sheet.write(0, col, name, title_style)
         # Train/validation loop
-        for epoch in range(num_epochs):
+        for epoch in range(old_epochs+1, num_epochs):
             # Initializing histrogram for current epoch
             class_terminal_hist[epoch] = list(np.zeros(steps_per_episode))
+            epoch_rewards = []
             terminal_hist = list(np.zeros(steps_per_episode))
             for episode in range(num_episodes):
                 state = environment.reset()
@@ -240,13 +241,14 @@ if __name__ == '__main__':
                         if action == train_labels[episode]:
                             epoch_correct += 1
                     cum_reward += reward
+                    epoch_rewards.append(cum_reward)
                     current_ep += 1
                 # Stats for current episode
-                sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Cumulative Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch + old_epochs,
-                                                                                                                     ep=episode,
-                                                                                                                     cr=round(cum_reward, 3),
-                                                                                                                     ec=round((epoch_correct / current_ep)*100, 3)
-                                                                                                                     ))
+                sys.stdout.write('\rEpoch {epoch} - Episode {ep} - Avg Epoch Reward: {cr} - Accuracy: {ec}%'.format(epoch=epoch + old_epochs,
+                                                                                                                    ep=episode,
+                                                                                                                    cr=round(sum(epoch_rewards) / current_ep, 3),
+                                                                                                                    ec=round((epoch_correct / current_ep)*100, 3)
+                                                                                                                    ))
                 sys.stdout.flush()
             agent.save(directory=checkpoints_dir,
                        filename='agent-{e}'.format(e=epoch+old_epochs),
@@ -254,7 +256,7 @@ if __name__ == '__main__':
             # Reset correct and episode count
             epoch_accuracy = round((epoch_correct / current_ep) * 100, 2)
             epoch_correct = 0
-            current_ep = 1
+            current_ep = 0
             # Validating at the end of each epoch
             print('\n')
             rewards = []
@@ -291,9 +293,13 @@ if __name__ == '__main__':
                 avg_reward = np.sum(rewards) / len(rewards)
                 avg_class_attempt = class_attempt / i
                 avg_mov_attempt = mov_attempt / i
-                sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}% - Avg. Classification Moves: {ca} - Avg. Movement Moves: {ma}'
+                # Avoiding division by 0 in stats
+                if class_attempt == 0:
+                    class_attempt = 1
+                sys.stdout.write('\rValidation: Episode {ep} - Average reward: {cr} - Correct: {ok}% - Real Class Attempt Accuracy: {okc}% - Avg. Classification Moves: {ca} - Avg. Movement Moves: {ma}'
                                  .format(ep=i, cr=round(avg_reward, 3),
                                          ok=round((correct / i)*100, 2),
+                                         okc=round((correct / class_attempt)*100, 2),
                                          ca=round(avg_class_attempt, 2),
                                          ma=round(avg_mov_attempt, 2)))
                 sys.stdout.flush()
@@ -303,9 +309,10 @@ if __name__ == '__main__':
             sheet.write(epoch + 1, 0, str(epoch+old_epochs), data_style)
             sheet.write(epoch + 1, 1, str(round(avg_reward, 3)), data_style)
             sheet.write(epoch + 1, 2, str(epoch_accuracy) + "%", data_style)
-            sheet.write(epoch + 1, 3, str(round((correct / i)*100, 2)) + "%", data_style)
-            sheet.write(epoch + 1, 4, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
-            sheet.write(epoch + 1, 5, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 3, str(round((correct / class_attempt) * 100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 4, str(round((correct / i)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 5, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+            sheet.write(epoch + 1, 6, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
             # Shuffling data at each epoch
             train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images,
                                                                                      labels=train_labels,

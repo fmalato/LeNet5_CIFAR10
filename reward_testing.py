@@ -17,25 +17,16 @@ if __name__ == '__main__':
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
-        batch_size = 50
-        sampling_ratio = 0.5
-        discount = 0.999
         num_classes = 10
-        lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-3
-        baseline_lr = 1e-2
-        e_r = 0.2
-        split_ratio = 0.8
         # Reward parameters
         class_penalty = 0.15
         correct_class = 2.0
-        illegal_mov = 0.25
+        illegal_mov = 0.35
         same_position = 0.05
         # Control parameters
         visualize = False
         # Train/test parameters
-        num_epochs = 1
         images_per_class = 50
         ########################### PREPROCESSING ##############################
         # Network initialization
@@ -95,10 +86,15 @@ if __name__ == '__main__':
             terminal = False
             ep_reward = 0
             state = environment.reset()
+            step_count = 0
+            print("Env reset. Starting position: {pos}".format(pos=environment.environment.agent_pos))
             while not terminal:
-                action = int(input("(Correct class: {cc}) Select action: ".format(cc=test_labels[i - 1])))
+                action = int(input("(Correct class: {cc} - Step {s}) Select action: ".format(cc=test_labels[i - 1],
+                                                                                             s=step_count)))
                 state, terminal, reward = environment.execute(actions=action)
-                print("Step reward: {rew} - Current position: {pos}".format(rew=round(reward, 3), pos=environment.environment.agent_pos))
+                step_count += 1
+                print("Step reward: {rew} - Current position: {pos}".format(rew=round(reward, 3),
+                                                                            pos=environment.environment.agent_pos))
                 if terminal:
                     if action == test_labels[i - 1]:
                         correct += 1

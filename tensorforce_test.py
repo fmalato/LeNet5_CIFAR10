@@ -18,7 +18,7 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 50
-        sampling_ratio = 0.5
+        sampling_ratio = 0.75
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
@@ -84,11 +84,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210320-100559']
+        dirs = ['models/RL/20210323-112649']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('Testing {dir}'.format(dir=directory))
-            old_epochs = 100
+            old_epochs = 43
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
