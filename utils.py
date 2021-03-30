@@ -141,6 +141,16 @@ def n_images_per_class(n, labels, num_classes, starting_index=0):
     return indexes, ordered_labels
 
 
+def n_images_per_class_new(n, labels, num_classes):
+    by_class = [[] for x in range(num_classes)]
+    for i in range(num_classes):
+        for l in range(len(labels)):
+            if labels[l] == i:
+                by_class[i].append(l)
+    selected = np.concatenate([x[:n] for x in by_class])
+    return selected
+
+
 def split_dataset(dataset, labels, ratio=0.8):
     splitting_index = int(len(dataset)*ratio)
 

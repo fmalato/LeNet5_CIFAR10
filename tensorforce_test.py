@@ -9,7 +9,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from utils import split_dataset, n_images_per_class
+from utils import split_dataset, n_images_per_class_new
 
 
 if __name__ == '__main__':
@@ -21,10 +21,11 @@ if __name__ == '__main__':
         sampling_ratio = 0.75
         discount = 0.999
         num_classes = 10
+        lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-3
-        baseline_lr = 1e-2
+        policy_lr = 1e-4
+        baseline_lr = 1e-3
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -36,7 +37,7 @@ if __name__ == '__main__':
         visualize = False
         # Train/test parameters
         num_epochs = 1
-        images_per_class = 50
+        images_per_class = 200
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -44,9 +45,9 @@ if __name__ == '__main__':
             net.load_weights('models/model_CIFAR10/20210303-125114.h5')
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
-            img_idxs, labels = n_images_per_class(n=images_per_class, labels=test_labels, num_classes=len(class_names))
+            img_idxs= n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
             test_images = np.array([test_images[idx] for idx in img_idxs])
-            test_labels = np.array(labels)
+            test_labels = np.array([test_labels[idx] for idx in img_idxs])
             test_images = test_images / 255.0
             # Initializing everything that the env requires to work properly
             RGB_images = copy.deepcopy(test_images)
@@ -84,21 +85,21 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210324-163224']
+        dirs = ['models/RL/20210329-125322']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('Testing {dir}'.format(dir=directory))
-            old_epochs = 50
+            old_epochs = 76
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
                                environment=environment,
                                agent='ppo',
                                network=[
-                                       dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu'),
+                                       dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
                                ],
                                baseline=[
-                                   dict(type='lstm', size=64, horizon=lstm_horizon, activation='relu')
+                                   dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
                                ],
                                baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                learning_rate=policy_lr,

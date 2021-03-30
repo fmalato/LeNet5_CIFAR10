@@ -102,8 +102,9 @@ class DyadicConvnetGymEnv(gym.Env):
         # If agent classifies well, end the episode
         else:
             self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
-            if action == self.image_class:
-                done = True
+            """if action == self.image_class:
+                done = True"""
+            done = True
 
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
