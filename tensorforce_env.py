@@ -18,14 +18,13 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 13
         up_bottom_right = 14
 
-    def __init__(self, dataset, images, labels, distributions, max_steps, visualize=False, testing=False, tile_width=10,
+    def __init__(self, dataset, images, labels, max_steps, visualize=False, testing=False, num_classes=10, tile_width=10,
                  num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.dataset = dataset
-        self.images = images
+        self.images = images if visualize else None
         self.labels = labels
-        self.distributions = distributions
         self.dataset_length = len(self.dataset)
         self.num_layers = num_layers
         # Extracting current training image from dataset
@@ -33,15 +32,13 @@ class DyadicConvnetGymEnv(gym.Env):
         self.image_class = None
         # CNN representation of the extracted image
         self.features = None
-        # CNN distribution over selected image
-        self.distribution = None
         # Will need this for computing the reward
         self.actions = DyadicConvnetGymEnv.Actions
         # Single action space
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
                                          })"""
-        self.num_actions = len(distributions[0]) + len(self.actions)
+        self.num_actions = num_classes + len(self.actions)
         self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
         self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(147,), dtype=np.float32)
@@ -102,8 +99,6 @@ class DyadicConvnetGymEnv(gym.Env):
         # If agent classifies well, end the episode
         else:
             self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
-            """if action == self.image_class:
-                done = True"""
             done = True
 
         if self.visualize:
@@ -137,9 +132,9 @@ class DyadicConvnetGymEnv(gym.Env):
     def reset(self):
         # New image extraction
         self.features = self.dataset[self.episodes_count]
-        self.train_image = self.images[self.episodes_count]
+        if self.visualize:
+            self.train_image = self.images[self.episodes_count]
         self.image_class = int(self.labels[self.episodes_count])
-        self.distribution = self.distributions[self.episodes_count]
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)

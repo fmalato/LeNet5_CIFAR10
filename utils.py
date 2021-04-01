@@ -141,32 +141,58 @@ def n_images_per_class(n, labels, num_classes, starting_index=0):
     return indexes, ordered_labels
 
 
-def n_images_per_class_new(n, labels, num_classes):
+def divide_by_class(labels, num_classes):
     by_class = [[] for x in range(num_classes)]
     for i in range(num_classes):
         for l in range(len(labels)):
             if labels[l] == i:
                 by_class[i].append(l)
+
+    return by_class
+
+
+def n_images_per_class_new(n, labels, num_classes):
+    by_class = divide_by_class(labels, num_classes)
     selected = np.concatenate([x[:n] for x in by_class])
+    # We shuffle here because we don't want labels to be divided by class
+    np.random.shuffle(selected)
     return selected
 
 
-def split_dataset(dataset, labels, ratio=0.8):
-    splitting_index = int(len(dataset)*ratio)
+def split_dataset(dataset, labels, ratio=0.8, num_classes=10):
+    splitting_index = int(len(dataset)*ratio/num_classes)
+    # We need data to be balanced
+    by_class = divide_by_class(labels, num_classes)
+    balanced_train_idxs = []
+    balanced_valid_idxs = []
+    for i in range(num_classes):
+        balanced_train_idxs.append(by_class[i][:splitting_index])
+        balanced_valid_idxs.append(by_class[i][splitting_index:])
+    balanced_train = []
+    train_labels = []
+    for c in balanced_train_idxs:
+        for el in c:
+            balanced_train.append(dataset[el])
+            train_labels.append(list(labels[el]))
+    balanced_valid = []
+    valid_labels = []
+    for c in balanced_valid_idxs:
+        for el in c:
+            balanced_valid.append(dataset[el])
+            valid_labels.append(list(labels[el]))
 
-    return dataset[:splitting_index], dataset[splitting_index:], labels[:splitting_index], labels[splitting_index:]
+    return balanced_train, balanced_valid, train_labels, valid_labels
 
 
-def shuffle_data(dataset, labels, distributions, RGB_imgs):
+def shuffle_data(dataset, labels, RGB_imgs, visualize=False):
     shuffled_data = []
     shuffled_labels = []
-    shuffled_distributions = []
     shuffled_RGB = []
     perm = np.random.permutation(len(dataset))
     for i in range(len(dataset)):
         shuffled_data.append(dataset[perm[i]])
         shuffled_labels.append(labels[perm[i]])
-        shuffled_distributions.append(distributions[perm[i]])
-        shuffled_RGB.append(RGB_imgs[perm[i]])
+        if visualize:
+            shuffled_RGB.append(RGB_imgs[perm[i]])
 
-    return np.array(shuffled_data), np.array(shuffled_labels), np.array(shuffled_distributions), np.array(shuffled_RGB)
+    return np.array(shuffled_data), np.array(shuffled_labels), np.array(shuffled_RGB)

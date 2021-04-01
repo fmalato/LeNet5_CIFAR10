@@ -26,9 +26,9 @@ if __name__ == '__main__':
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
-        lstm_units = 64
+        lstm_units = 128
         steps_per_episode = 15
-        policy_lr = 1e-3
+        policy_lr = 1e-4
         baseline_lr = 1e-3
         e_r = 0.2
         split_ratio = 0.8
@@ -41,8 +41,12 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = False
         # Train/test parameters
-        num_epochs = 50
-        images_per_class = 1000
+        num_epochs = 10
+        partial_dataset = False
+        if partial_dataset:
+            images_per_class = 1000
+        else:
+            images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
                       images_per_class]
@@ -57,36 +61,46 @@ if __name__ == '__main__':
             print('Computing whole dataset features...')
             # Dataset initialization - we don't need test data here
             (train_images, train_labels), (_, _) = datasets.cifar10.load_data()
-            img_idxs, labels = n_images_per_class_new(n=images_per_class, labels=train_labels, num_classes=len(class_names))
-            train_images = np.array([train_images[idx] for idx in img_idxs])
-            train_labels = np.array(labels)
+            train_images = np.array(train_images, dtype=np.float32)
+            if partial_dataset:
+                img_idxs = n_images_per_class_new(n=images_per_class, labels=train_labels, num_classes=len(class_names))
+                train_images = np.array([train_images[idx] for idx in img_idxs])
+                train_labels = np.array([train_labels[idx] for idx in img_idxs])
             train_images = train_images / 255.0
             # Initializing everything that the env requires to work properly
-            RGB_images = copy.deepcopy(train_images)
+            if visualize:
+                RGB_images = copy.deepcopy(train_images)
+            else:
+                RGB_images = None
             tmp = []
             distributions = []
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
+            idx = 0
             for img in train_images:
+                sys.stdout.write('\rComputing image {current}/{num_img}'.format(current=idx, num_img=train_images.shape[0]))
                 img = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
                 tmp.append(net.extract_features(img))
-                # Distribution are computed in the exact same order as training images
-                distributions.append(np.reshape(net(img).numpy(), (10,)))
+                idx += 1
             # Split training and validation set
-            train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels, ratio=split_ratio)
-            train_distrib, valid_distrib, _, _ = split_dataset(dataset=distributions, labels=range(len(distributions)), ratio=split_ratio)
+            train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels,
+                                                                                   ratio=split_ratio, num_classes=num_classes)
             # Also getting RGB images for visualization TODO: make it 'visualize'-wise without breaking the environment
-            train_RGB_imgs = RGB_images[:int(RGB_images.shape[0] * split_ratio)]
-            valid_RGB_imgs = RGB_images[int(RGB_images.shape[0] * split_ratio):]
+            if visualize:
+                train_RGB_imgs = RGB_images[:int(RGB_images.shape[0] * split_ratio)]
+                valid_RGB_imgs = RGB_images[int(RGB_images.shape[0] * split_ratio):]
+            else:
+                train_RGB_imgs = None
+                valid_RGB_imgs = None
             # We don't need them anymore - Bye bye CNN!
             del tmp, distributions
             del net
-            print('Done.\n')
+            print('\nDone.\n')
             #########################################################################
         # Shuffling everything there is to shuffle
-        train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images, labels=train_labels,
-                                                                                 distributions=train_distrib, RGB_imgs=train_RGB_imgs)
-        valid_images, valid_labels, valid_distrib, valid_RGB_imgs = shuffle_data(dataset=valid_images, labels=valid_labels,
-                                                                                 distributions=valid_distrib, RGB_imgs=valid_RGB_imgs)
+        train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images, labels=train_labels,
+                                                                  RGB_imgs=train_RGB_imgs, visualize=visualize)
+        valid_images, valid_labels, valid_RGB_imgs = shuffle_data(dataset=valid_images, labels=valid_labels,
+                                                                  RGB_imgs=valid_RGB_imgs, visualize=visualize)
         num_episodes = len(train_labels)
         num_images = len(train_labels)
         len_valid = len(valid_labels)
@@ -94,7 +108,6 @@ if __name__ == '__main__':
         environment = DyadicConvnetGymEnv(dataset=train_images,
                                           labels=train_labels,
                                           images=train_RGB_imgs,
-                                          distributions=train_distrib,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
                                           testing=False,
@@ -116,7 +129,6 @@ if __name__ == '__main__':
         valid_environment = DyadicConvnetGymEnv(dataset=valid_images,
                                                 labels=valid_labels,
                                                 images=valid_RGB_imgs,
-                                                distributions=valid_distrib,
                                                 max_steps=steps_per_episode,
                                                 visualize=visualize,
                                                 testing=False,
@@ -136,8 +148,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210326-132339'
-            old_epochs = 300
+            directory = 'models/RL/20210331-162629'
+            old_epochs = 10
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = Agent.load(directory=directory + '/checkpoints/',
                                filename='agent-{oe}'.format(oe=old_epochs-1),
@@ -317,25 +329,23 @@ if __name__ == '__main__':
                 sheet.write(epoch + 1 - old_epochs, 3, str(round(avg_reward, 3)), data_style)
                 sheet.write(epoch + 1 - old_epochs, 4, str(round((correct / i)*100, 2)) + "%", data_style)
                 sheet.write(epoch + 1 - old_epochs, 5, str(round((correct / class_attempt) * 100, 2)) + "%", data_style)
-                sheet.write(epoch + 1 - old_epochs, 6, str(round((avg_class_attempt / steps_per_episode)*100, 2)) + "%", data_style)
-                sheet.write(epoch + 1 - old_epochs, 7, str(round((avg_mov_attempt / steps_per_episode)*100, 2)) + "%", data_style)
+                sheet.write(epoch + 1 - old_epochs, 6, str(avg_class_attempt), data_style)
+                sheet.write(epoch + 1 - old_epochs, 7, str(avg_mov_attempt), data_style)
                 # Shuffling data at each epoch
-                train_images, train_labels, train_distrib, train_RGB_imgs = shuffle_data(dataset=train_images,
-                                                                                         labels=train_labels,
-                                                                                         distributions=train_distrib,
-                                                                                         RGB_imgs=train_RGB_imgs)
-                valid_images, valid_labels, valid_distrib, valid_RGB_imgs = shuffle_data(dataset=valid_images,
-                                                                                         labels=valid_labels,
-                                                                                         distributions=valid_distrib,
-                                                                                         RGB_imgs=valid_RGB_imgs)
+                train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images,
+                                                                          labels=train_labels,
+                                                                          RGB_imgs=train_RGB_imgs,
+                                                                          visualize=visualize)
+                valid_images, valid_labels, valid_RGB_imgs = shuffle_data(dataset=valid_images,
+                                                                          labels=valid_labels,
+                                                                          RGB_imgs=valid_RGB_imgs,
+                                                                          visualize=visualize)
                 # Setting new permutation of data on envs
                 environment.environment.dataset = train_images
                 environment.environment.labels = train_labels
-                environment.environment.distributions = train_distrib
                 environment.environment.images = train_RGB_imgs
                 valid_environment.environment.dataset = valid_images
                 valid_environment.environment.labels = valid_labels
-                valid_environment.environment.distributions = valid_distrib
                 valid_environment.environment.images = valid_RGB_imgs
                 print('\n')
             # Save excel sheet at the end of training

@@ -37,7 +37,11 @@ if __name__ == '__main__':
         visualize = False
         # Train/test parameters
         num_epochs = 1
-        images_per_class = 200
+        partial_dataset = True
+        if partial_dataset:
+            images_per_class = 200
+        else:
+            images_per_class = 1000
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -45,20 +49,18 @@ if __name__ == '__main__':
             net.load_weights('models/model_CIFAR10/20210303-125114.h5')
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
-            img_idxs= n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
+            test_images = np.array(test_images, dtype=np.float32)
+            img_idxs = n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
             test_images = np.array([test_images[idx] for idx in img_idxs])
             test_labels = np.array([test_labels[idx] for idx in img_idxs])
             test_images = test_images / 255.0
             # Initializing everything that the env requires to work properly
             RGB_images = copy.deepcopy(test_images)
             tmp = []
-            distributions = []
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
             for img in test_images:
                 image = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
                 tmp.append(net.extract_features(image))
-                # Distribution are computed in the exact same order as training images
-                distributions.append(np.reshape(net(image).numpy(), (10,)))
             test_images = copy.deepcopy(tmp)
             del train_images, train_labels
             del net, tmp
@@ -67,7 +69,6 @@ if __name__ == '__main__':
         environment = DyadicConvnetGymEnv(dataset=test_images,
                                           labels=test_labels,
                                           images=RGB_images,
-                                          distributions=distributions,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
                                           testing=True,
@@ -85,11 +86,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210329-125322']
+        dirs = ['models/RL/20210331-162629']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('Testing {dir}'.format(dir=directory))
-            old_epochs = 76
+            old_epochs = 10
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -109,8 +110,7 @@ if __name__ == '__main__':
                                states=dict(
                                    features=dict(type=float, shape=(147,)),
                                ),
-                               actions=dict(type=int, num_values=num_actions+num_classes),
-                               entropy_regularization=e_r
+                               actions=dict(type=int, num_values=num_actions+num_classes)
                                )
             # Parameters for test loop
             episode = 0
