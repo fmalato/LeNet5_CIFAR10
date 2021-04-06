@@ -45,6 +45,7 @@ class DyadicConvnetGymEnv(gym.Env):
                                               })
         self.step_count = 0
         self.agent_pos = None
+        self.ep_visited = None
         self.agent_classification = None
         self.one_hot_action = None
         self.max_steps = max_steps
@@ -101,6 +102,12 @@ class DyadicConvnetGymEnv(gym.Env):
             self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
             done = True
 
+        if self.agent_pos not in self.ep_visited:
+            self.ep_visited.append(self.agent_pos)
+            new_state = 0.01
+        else:
+            new_state = 0.0
+
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
@@ -120,7 +127,7 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.agent_pos == old_pos and action != self.image_class:
             self.mov_reward -= self.same_position
 
-        reward = self.class_reward + self.mov_reward
+        reward = self.class_reward + self.mov_reward #+ 0.01*self.step_count + new_state
         # Adjusting parameters for new observation
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
         self.last_reward = [reward]
@@ -142,6 +149,8 @@ class DyadicConvnetGymEnv(gym.Env):
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         self.agent_pos = (starting_layer, starting_x, starting_y)
+        self.ep_visited = []
+        self.ep_visited.append(self.agent_pos)
         self.last_reward = [0.0]
         self.one_hot_action = [0.0 for x in range(self.num_actions)]
         self.step_count = 0

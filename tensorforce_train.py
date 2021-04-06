@@ -7,7 +7,7 @@ import json
 
 import numpy as np
 import tensorflow as tf
-from tensorforce.agents import Agent
+from tensorforce.agents import ProximalPolicyOptimization
 from tensorforce.environments import Environment
 from tensorflow.keras import datasets
 
@@ -22,14 +22,14 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 50
-        sampling_ratio = 0.99
+        sampling_ratio = 0.75
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
         lstm_units = 128
         steps_per_episode = 15
-        policy_lr = 1e-4
-        baseline_lr = 1e-3
+        policy_lr = 5e-5
+        baseline_lr = 5e-4
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -41,10 +41,10 @@ if __name__ == '__main__':
         visualize = False
         load_checkpoint = False
         # Train/test parameters
-        num_epochs = 10
+        num_epochs = 5
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 1000
+            images_per_class = 100
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
@@ -151,61 +151,63 @@ if __name__ == '__main__':
             directory = 'models/RL/20210331-162629'
             old_epochs = 10
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
-            agent = Agent.load(directory=directory + '/checkpoints/',
-                               filename='agent-{oe}'.format(oe=old_epochs-1),
-                               format='hdf5',
-                               environment=environment,
-                               agent='ppo',
-                               max_episode_timesteps=steps_per_episode,
-                               network=[
-                                       dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
-                               ],
-                               baseline=[
-                                   dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
-                               ],
-                               baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
-                               # TODO: Huge file - find minimum number of parameters
-                               summarizer=dict(
-                                   directory='data/summaries',
-                                   summaries=['action-value', 'entropy', 'reward', 'distribution']
-                               ),
-                               learning_rate=policy_lr,
-                               batch_size=batch_size,
-                               tracking=['distribution'],
-                               discount=discount,
-                               states=dict(
-                                   features=dict(type=float, shape=(147,)),
-                               ),
-                               actions=dict(type=int, num_values=num_actions+num_classes),
-                               entropy_regularization=e_r
-                               )
+            agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
+                                                    filename='agent-{oe}'.format(oe=old_epochs-1),
+                                                    format='hdf5',
+                                                    environment=environment,
+                                                    agent='ppo',
+                                                    max_episode_timesteps=steps_per_episode,
+                                                    network=[
+                                                            dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
+                                                    ],
+                                                    baseline=[
+                                                        dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
+                                                    ],
+                                                    baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
+                                                    # TODO: Huge file - find minimum number of parameters
+                                                    summarizer=dict(
+                                                        directory='data/summaries',
+                                                        summaries=['action-value', 'entropy', 'reward', 'distribution']
+                                                    ),
+                                                    learning_rate=policy_lr,
+                                                    batch_size=batch_size,
+                                                    tracking=['distribution'],
+                                                    discount=discount,
+                                                    states=dict(
+                                                        features=dict(type=float, shape=(147,)),
+                                                    ),
+                                                    actions=dict(type=int, num_values=num_actions+num_classes),
+                                                    entropy_regularization=e_r,
+                                                    subsampling_fraction=sampling_ratio
+                                                    )
         else:
             old_epochs = 0
-            agent = Agent.create(environment=environment,
-                                 agent='ppo',
-                                 max_episode_timesteps=steps_per_episode,
-                                 network=[
-                                     dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
-                                 ],
-                                 baseline=[
-                                     dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
-                                 ],
-                                 baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
-                                 # TODO: Huge file - find minimum number of parameters
-                                 summarizer=dict(
-                                     directory='data/summaries',
-                                     summaries=['action-value', 'entropy', 'reward', 'distribution']
-                                 ),
-                                 learning_rate=policy_lr,
-                                 batch_size=batch_size,
-                                 tracking=['distribution'],
-                                 discount=discount,
-                                 states=dict(
-                                     features=dict(type=float, shape=(147,)),
-                                 ),
-                                 actions=dict(type=int, num_values=num_actions+num_classes),
-                                 entropy_regularization=e_r
-                                 )
+            agent = ProximalPolicyOptimization.create(environment=environment,
+                                                      agent='ppo',
+                                                      max_episode_timesteps=steps_per_episode,
+                                                      network=[
+                                                          dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
+                                                      ],
+                                                      baseline=[
+                                                          dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
+                                                      ],
+                                                      baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
+                                                      # TODO: Huge file - find minimum number of parameters
+                                                      summarizer=dict(
+                                                          directory='data/summaries',
+                                                          summaries=['action-value', 'entropy', 'reward', 'distribution']
+                                                      ),
+                                                      learning_rate=policy_lr,
+                                                      batch_size=batch_size,
+                                                      tracking=['distribution'],
+                                                      discount=discount,
+                                                      states=dict(
+                                                          features=dict(type=float, shape=(147,)),
+                                                      ),
+                                                      actions=dict(type=int, num_values=num_actions+num_classes),
+                                                      entropy_regularization=e_r,
+                                                      subsampling_fraction=sampling_ratio
+                                                      )
         # Parameters for training loop
         epoch_correct = 0
         current_ep = 0
@@ -302,7 +304,6 @@ if __name__ == '__main__':
                                 correct += 1
                         ep_reward += reward
                         if int(action) < 10:
-                            # Add a classification attempt at timestep t
                             # Add a classification attempt
                             class_attempt += 1
                         else:

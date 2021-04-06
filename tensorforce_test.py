@@ -18,7 +18,7 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 50
-        sampling_ratio = 0.75
+        sampling_ratio = 0.99
         discount = 0.999
         num_classes = 10
         lstm_units = 128
@@ -39,7 +39,7 @@ if __name__ == '__main__':
         num_epochs = 1
         partial_dataset = True
         if partial_dataset:
-            images_per_class = 200
+            images_per_class = 50
         else:
             images_per_class = 1000
         ########################### PREPROCESSING ##############################
@@ -50,17 +50,22 @@ if __name__ == '__main__':
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
             test_images = np.array(test_images, dtype=np.float32)
-            img_idxs = n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
-            test_images = np.array([test_images[idx] for idx in img_idxs])
-            test_labels = np.array([test_labels[idx] for idx in img_idxs])
+            if partial_dataset:
+                img_idxs = n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
+                test_images = np.array([test_images[idx] for idx in img_idxs])
+                test_labels = np.array([test_labels[idx] for idx in img_idxs])
             test_images = test_images / 255.0
             # Initializing everything that the env requires to work properly
             RGB_images = copy.deepcopy(test_images)
             tmp = []
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
+            idx = 0
             for img in test_images:
+                sys.stdout.write(
+                    '\rComputing image {current}/{num_img}'.format(current=idx, num_img=test_images.shape[0]))
                 image = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
                 tmp.append(net.extract_features(image))
+                idx += 1
             test_images = copy.deepcopy(tmp)
             del train_images, train_labels
             del net, tmp
@@ -86,11 +91,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210331-162629']
+        dirs = ['models/RL/20210405-150839']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('Testing {dir}'.format(dir=directory))
-            old_epochs = 10
+            old_epochs = 200
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -115,6 +120,7 @@ if __name__ == '__main__':
             # Parameters for test loop
             episode = 0
             correct = 0
+            class_attempt = 0
             rewards = []
             num_images = len(test_labels)
             # Test loop
@@ -131,11 +137,15 @@ if __name__ == '__main__':
                     if terminal:
                         if action == test_labels[i - 1]:
                             correct += 1
+                        if int(action) < 10:
+                            # Add a classification attempt
+                            class_attempt += 1
                     ep_reward += reward
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
-                sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}%'.format(ep=i,
-                                                                                                       cr=round(avg_reward, 3),
-                                                                                                       ok=round((correct / i) * 100, 2)))
+                sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}%'.format(ep=i,
+                                                                                                                               cr=round(avg_reward, 3),
+                                                                                                                               ok=round((correct / i) * 100, 2),
+                                                                                                                               rcaok=round((correct / class_attempt) * 100, 2)))
                 sys.stdout.flush()
             print('\n')
