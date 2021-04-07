@@ -13,7 +13,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from utils import split_dataset, n_images_per_class_new, shuffle_data
+from utils import split_dataset, split_dataset_idxs, n_images_per_class_new, shuffle_data
 
 
 if __name__ == '__main__':
@@ -22,14 +22,14 @@ if __name__ == '__main__':
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
         batch_size = 50
-        sampling_ratio = 0.75
+        sampling_ratio = 0.33
         discount = 0.999
         num_classes = 10
         lstm_horizon = 5
         lstm_units = 128
         steps_per_episode = 15
-        policy_lr = 5e-5
-        baseline_lr = 5e-4
+        policy_lr = 1e-4
+        baseline_lr = 1e-3
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -40,11 +40,12 @@ if __name__ == '__main__':
         # Control parameters
         visualize = False
         load_checkpoint = False
+        same_split = False
         # Train/test parameters
-        num_epochs = 5
-        partial_dataset = False
+        num_epochs = 20
+        partial_dataset = True
         if partial_dataset:
-            images_per_class = 100
+            images_per_class = 10
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
@@ -75,15 +76,22 @@ if __name__ == '__main__':
             tmp = []
             distributions = []
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
-            idx = 0
+            idx = 1
             for img in train_images:
                 sys.stdout.write('\rComputing image {current}/{num_img}'.format(current=idx, num_img=train_images.shape[0]))
                 img = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
                 tmp.append(net.extract_features(img))
                 idx += 1
             # Split training and validation set
-            train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels,
-                                                                                   ratio=split_ratio, num_classes=num_classes)
+            if same_split:
+                with open('training_idxs.json', 'r') as f:
+                    idxs = json.load(f)
+                    f.close()
+                train_images, valid_images, train_labels, valid_labels = split_dataset_idxs(dataset=tmp, labels=train_labels,
+                                                                                            train_idxs=idxs['train'], valid_idxs=idxs['valid'])
+            else:
+                train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels,
+                                                                                       ratio=split_ratio, num_classes=num_classes)
             # Also getting RGB images for visualization TODO: make it 'visualize'-wise without breaking the environment
             if visualize:
                 train_RGB_imgs = RGB_images[:int(RGB_images.shape[0] * split_ratio)]
@@ -148,8 +156,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210331-162629'
-            old_epochs = 10
+            directory = 'models/RL/20210406-103941'
+            old_epochs = 7
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
@@ -229,8 +237,9 @@ if __name__ == '__main__':
         title_style = xlwt.easyxf('font: bold on; align: horiz center; pattern: pattern solid, fore_colour orange; borders: left thin, right thin, top thin, bottom thin;')
         data_style = xlwt.easyxf('align: horiz center; borders: left thin, right thin, top thin, bottom thin;')
         # Making first column for the sake of readability
-        stat_names = ['Epoch', 'Train Avg Reward', 'Epoch Accuracy', 'Valid Avg Reward', 'Valid Accuracy', 'RCA Accuracy', 'Avg.Class', 'Avg.Move']
+        stat_names = ['Epoch', 'Train Avg Reward', 'Train Accuracy', 'Valid Avg Reward', 'Valid Accuracy', 'RCA Accuracy', 'Avg.Class', 'Avg.Move']
         cumulative_accuracy = {}
+        mov_histogram = {}
         for col, name in zip(range(len(stat_names)), stat_names):
             sheet.write(0, col, name, title_style)
         # Train/validation loop
@@ -289,7 +298,9 @@ if __name__ == '__main__':
                 class_attempt = 0
                 mov_attempt = 0
                 valid_environment.environment.episodes_count = 0
+                mov_histogram[epoch] = np.zeros((steps_per_episode,))
                 for i in range(1, len_valid + 1):
+                    ep_moves = 0
                     terminal = False
                     ep_reward = 0
                     state = valid_environment.reset()
@@ -302,12 +313,14 @@ if __name__ == '__main__':
                         if terminal:
                             if action == valid_labels[i-1]:
                                 correct += 1
+                            mov_histogram[ep_moves] += 1
                         ep_reward += reward
                         if int(action) < 10:
                             # Add a classification attempt
                             class_attempt += 1
                         else:
                             mov_attempt += 1
+                        ep_moves += 1
                     rewards.append(ep_reward)
                     # Computing stats in real time
                     avg_reward = np.sum(rewards) / len(rewards)
@@ -359,7 +372,8 @@ if __name__ == '__main__':
             xl_sheet.save(stats_dir + current_time + ".xlsx")
             xl_sheet_accuracy = xlwt.Workbook()
             sheet_acc = xl_sheet_accuracy.add_sheet(current_time)
-            titles = ['Epoch', 'T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12', 'T13', 'T14']
+            titles = ['Epoch', 'T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12', 'T13',
+                      'T14']
             for col, name in zip(range(len(titles)), titles):
                 sheet_acc.write(0, col, name, title_style)
             for key in cumulative_accuracy.keys():
@@ -369,8 +383,10 @@ if __name__ == '__main__':
                     sheet_acc.write(int(key) + 1, col, el, data_style)
                     col += 1
             xl_sheet_accuracy.save(stats_dir + "cumulative_accuracy.xlsx")
+            with open(stats_dir + '/movement_histogram.json', 'w+') as f:
+                json.dump(mov_histogram, f)
+        # Not elegant, but it saves data if training is interrupted
         except KeyboardInterrupt:
-            # If we interrupt training, we save the excel sheet anyway
             idx = 3
             params_column = len(stat_names) + 2
             for name, value in zip(parameters_names, parameters):
@@ -391,3 +407,5 @@ if __name__ == '__main__':
                     sheet_acc.write(int(key) + 1, col, el, data_style)
                     col += 1
             xl_sheet_accuracy.save(stats_dir + "cumulative_accuracy.xlsx")
+            with open(stats_dir + '/movement_histogram.json', 'w+') as f:
+                json.dump(mov_histogram, f)

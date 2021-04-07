@@ -158,8 +158,8 @@ def n_images_per_class_new(n, labels, num_classes):
     np.random.shuffle(selected)
     return selected
 
-
-def split_dataset(dataset, labels, ratio=0.8, num_classes=10):
+# TODO: implement index-driven splitting
+def split_dataset(dataset, labels, ratio=0.8, num_classes=10, save_idxs=False):
     splitting_index = int(len(dataset)*ratio/num_classes)
     # We need data to be balanced
     by_class = divide_by_class(labels, num_classes)
@@ -180,8 +180,20 @@ def split_dataset(dataset, labels, ratio=0.8, num_classes=10):
         for el in c:
             balanced_valid.append(dataset[el])
             valid_labels.append(list(labels[el]))
+    if save_idxs:
+        idxs = {}
+        idxs['train'] = np.concatenate(balanced_train_idxs).tolist()
+        idxs['valid'] = np.concatenate(balanced_valid_idxs).tolist()
+        with open('training_idxs.json', 'w+') as f:
+            json.dump(idxs, f)
 
     return balanced_train, balanced_valid, train_labels, valid_labels
+
+
+def split_dataset_idxs(dataset, labels, train_idxs, valid_idxs):
+
+    return [dataset[x] for x in train_idxs], [dataset[x] for x in valid_idxs], \
+           [labels[x] for x in train_idxs], [labels[x] for x in valid_idxs]
 
 
 def shuffle_data(dataset, labels, RGB_imgs, visualize=False):

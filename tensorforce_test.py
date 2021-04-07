@@ -1,5 +1,6 @@
 import copy
 import sys
+import json
 
 import numpy as np
 import tensorflow as tf
@@ -39,7 +40,7 @@ if __name__ == '__main__':
         num_epochs = 1
         partial_dataset = True
         if partial_dataset:
-            images_per_class = 50
+            images_per_class = 10
         else:
             images_per_class = 1000
         ########################### PREPROCESSING ##############################
@@ -59,7 +60,7 @@ if __name__ == '__main__':
             RGB_images = copy.deepcopy(test_images)
             tmp = []
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
-            idx = 0
+            idx = 1
             for img in test_images:
                 sys.stdout.write(
                     '\rComputing image {current}/{num_img}'.format(current=idx, num_img=test_images.shape[0]))
@@ -68,7 +69,7 @@ if __name__ == '__main__':
                 idx += 1
             test_images = copy.deepcopy(tmp)
             del train_images, train_labels
-            del net, tmp
+            del tmp
         #########################################################################
         # Environment initialization
         environment = DyadicConvnetGymEnv(dataset=test_images,
@@ -91,11 +92,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210405-150839']
+        dirs = ['models/RL/20210406-103941']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
-            print('Testing {dir}'.format(dir=directory))
-            old_epochs = 200
+            print('\nTesting {dir}'.format(dir=directory))
+            old_epochs = 20
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -122,6 +123,10 @@ if __name__ == '__main__':
             correct = 0
             class_attempt = 0
             rewards = []
+            performance = {}
+            predicted_labels = []
+            true_labels = []
+            baseline_labels = []
             num_images = len(test_labels)
             # Test loop
             for i in range(1, len(test_labels) + 1):
@@ -140,6 +145,11 @@ if __name__ == '__main__':
                         if int(action) < 10:
                             # Add a classification attempt
                             class_attempt += 1
+                            predicted_labels.append(int(action))
+                            true_labels.append(int(test_labels[i-1]))
+                            with tf.device('/device:CPU:0'):
+                                pred = np.reshape(RGB_images[i-1], (1, 32, 32, 3))
+                                baseline_labels.append(int(np.argmax(net(pred))))
                     ep_reward += reward
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
@@ -149,3 +159,8 @@ if __name__ == '__main__':
                                                                                                                                rcaok=round((correct / class_attempt) * 100, 2)))
                 sys.stdout.flush()
             print('\n')
+            performance['predicted'] = predicted_labels
+            performance['true lab'] = true_labels
+            performance['baseline'] = baseline_labels
+            with open(directory + '/stats/predicted_labels.json', 'w+') as f:
+                json.dump(performance, f)
