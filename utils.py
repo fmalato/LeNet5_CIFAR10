@@ -2,11 +2,10 @@ import time
 import json
 import random
 import ast
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-from tensorflow.keras import datasets
 
 
 # Check execution time of a line/block of lines
@@ -158,7 +157,7 @@ def n_images_per_class_new(n, labels, num_classes):
     np.random.shuffle(selected)
     return selected
 
-# TODO: implement index-driven splitting
+
 def split_dataset(dataset, labels, ratio=0.8, num_classes=10, save_idxs=False):
     splitting_index = int(len(dataset)*ratio/num_classes)
     # We need data to be balanced
@@ -191,6 +190,8 @@ def split_dataset(dataset, labels, ratio=0.8, num_classes=10, save_idxs=False):
 
 
 def split_dataset_idxs(dataset, labels, train_idxs, valid_idxs):
+    print('\nLoading old splits...')
+    print('\nOld training: {x}..., old valid: {y}...'.format(x=train_idxs[:10], y=valid_idxs[:10]))
 
     return [dataset[x] for x in train_idxs], [dataset[x] for x in valid_idxs], \
            [labels[x] for x in train_idxs], [labels[x] for x in valid_idxs]
@@ -208,3 +209,50 @@ def shuffle_data(dataset, labels, RGB_imgs, visualize=False):
             shuffled_RGB.append(RGB_imgs[perm[i]])
 
     return np.array(shuffled_data), np.array(shuffled_labels), np.array(shuffled_RGB)
+
+
+def build_heatmap(positions, dir, scale_factor=16, show=True):
+    if not os.path.exists(dir + '/heatmaps/'):
+        os.mkdir(dir + '/heatmaps/')
+    # A 16x16 image is not readable and is heavily blurred when rescaled
+    env = {}
+    env[0] = np.zeros((16*scale_factor, 16*scale_factor))
+    env[1] = np.zeros((8*scale_factor, 8*scale_factor))
+    env[2] = np.zeros((4*scale_factor, 4*scale_factor))
+    env[3] = np.zeros((2*scale_factor, 2*scale_factor))
+    for el in positions:
+        for x in range(el[1] * scale_factor, (el[1] + 1) * scale_factor):
+            for y in range(el[2] * scale_factor, (el[2] + 1) * scale_factor):
+                env[el[0]][x][y] += 1
+
+    abs_max = np.max([np.max(env[key]) for key in env.keys()])
+
+    for key in env.keys():
+        env[key] /= abs_max
+        if show:
+            plt.imshow(env[key], cmap='hot')
+        plt.imsave(dir + '/heatmaps/{s}.png'.format(s=key), env[key])
+        plt.show()
+
+
+def plot_mov_histogram(dir_path, filepath, num_timesteps=15, nrows=4, ncols=5):
+    with open(dir_path + filepath, 'r') as f:
+        hist = json.load(f)
+        f.close()
+    steps = list(range(num_timesteps))
+    keys = list(hist.keys())
+    fig, axs = plt.subplots(nrows, ncols, figsize=(5*nrows, 3*ncols))
+    fig.suptitle('Movement histogram epoch by epoch')
+    idx = 0
+    if nrows == 1 and ncols == 1:
+        axs.bar(steps, hist[str(keys[idx])])
+    else:
+        for x in range(nrows):
+            for y in range(ncols):
+                axs[x, y].bar(steps, hist[str(keys[idx])])
+                axs[x, y].set_title('Epoch {idx}'.format(idx=idx))
+                idx += 1
+    plt.show()
+    fname = os.path.splitext(filepath)[0]
+    fig.savefig(fname=dir_path + '{fname}.png'.format(fname=fname))
+

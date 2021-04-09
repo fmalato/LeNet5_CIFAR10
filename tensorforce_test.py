@@ -10,7 +10,7 @@ from tensorflow.keras import datasets
 
 from tensorforce_net import DyadicConvNet
 from tensorforce_env import DyadicConvnetGymEnv
-from utils import split_dataset, n_images_per_class_new
+from utils import split_dataset, n_images_per_class_new, build_heatmap
 
 
 if __name__ == '__main__':
@@ -35,14 +35,15 @@ if __name__ == '__main__':
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
-        visualize = False
-        # Train/test parameters
+        visualize = True
+        # Test parameters
         num_epochs = 1
         partial_dataset = True
         if partial_dataset:
-            images_per_class = 10
+            images_per_class = 5
         else:
             images_per_class = 1000
+        heatmap_needed = False
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -92,7 +93,7 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210406-103941']
+        dirs = ['models/RL/20210402-115459']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
@@ -122,35 +123,48 @@ if __name__ == '__main__':
             episode = 0
             correct = 0
             class_attempt = 0
+            not_classified = 0
             rewards = []
             performance = {}
             predicted_labels = []
             true_labels = []
             baseline_labels = []
+            agent_positions = []
+            only_baseline = []
             num_images = len(test_labels)
+            mov_histogram = {}
+            mov_histogram[0] = np.zeros(steps_per_episode).tolist()
             # Test loop
             for i in range(1, len(test_labels) + 1):
                 terminal = False
                 ep_reward = 0
                 state = environment.reset()
                 internals = agent.initial_internals()
+                current_step = 0
                 while not terminal:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=True)
+                    if heatmap_needed:
+                        agent_positions.append(environment.environment.agent_pos)
                     environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
                     state, terminal, reward = environment.execute(actions=action)
                     if terminal:
+                        mov_histogram[0][current_step] += 1
                         if action == test_labels[i - 1]:
                             correct += 1
+                        with tf.device('/device:CPU:0'):
+                            pred = np.reshape(RGB_images[i-1], (1, 32, 32, 3))
+                            pred = net(pred)
                         if int(action) < 10:
                             # Add a classification attempt
                             class_attempt += 1
                             predicted_labels.append(int(action))
                             true_labels.append(int(test_labels[i-1]))
-                            with tf.device('/device:CPU:0'):
-                                pred = np.reshape(RGB_images[i-1], (1, 32, 32, 3))
-                                baseline_labels.append(int(np.argmax(net(pred))))
+                            baseline_labels.append(int(np.argmax(pred)))
+                        else:
+                            only_baseline.append((i-1, int(np.argmax(pred))))
                     ep_reward += reward
+                    current_step += 1
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
                 sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}%'.format(ep=i,
@@ -164,3 +178,38 @@ if __name__ == '__main__':
             performance['baseline'] = baseline_labels
             with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
+                f.close()
+            with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
+                json.dump(mov_histogram, f)
+            right_when_baseline_wrong = 0
+            wrong_when_baseline_right = 0
+            agent_baseline_wrong = 0
+            agent_baseline_right = 0
+            different_class = 0
+            same_class = 0
+            for i in range(len(performance['predicted'])):
+                if predicted_labels[i] == true_labels[i] and baseline_labels[i] == true_labels[i]:
+                    agent_baseline_right += 1
+                if predicted_labels[i] == true_labels[i] and baseline_labels[i] != true_labels[i]:
+                    right_when_baseline_wrong += 1
+                if predicted_labels[i] != true_labels[i] and baseline_labels[i] == true_labels[i]:
+                    wrong_when_baseline_right += 1
+                if predicted_labels[i] != true_labels[i] and baseline_labels[i] != true_labels[i]:
+                    agent_baseline_wrong += 1
+                    if predicted_labels[i] != baseline_labels[i]:
+                        different_class += 1
+                    else:
+                        same_class += 1
+                right = 0
+                for el in only_baseline:
+                    if el[1] == test_labels[el[0]]:
+                        right += 1
+            print('Number of times that agent improves baseline: %d / %d' % (right_when_baseline_wrong, len(test_labels)))
+            print('Number of times that agent fails when baseline does not: %d / %d' % (wrong_when_baseline_right, len(test_labels)))
+            print('Number of times that both agent and baseline are right: %d / %d' % (agent_baseline_right, len(test_labels)))
+            print('Number of times that both agent and baseline are wrong: %d / %d' % (agent_baseline_wrong, len(test_labels)))
+            print('    where agent and baseline predict the same class: %d / %d' % (different_class, len(test_labels)))
+            print('    where agent and baseline predict different classes: %d / %d' % (same_class, len(test_labels)))
+            print('Number of times that baseline produces correct output when agent does not classify: %d / %d' % (right, len(only_baseline)))
+            if heatmap_needed:
+                build_heatmap(agent_positions, dir=directory, show=False)

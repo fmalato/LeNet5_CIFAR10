@@ -39,11 +39,11 @@ if __name__ == '__main__':
         same_position = 0.05
         # Control parameters
         visualize = False
-        load_checkpoint = False
-        same_split = False
+        load_checkpoint = True
+        same_split = True
         # Train/test parameters
-        num_epochs = 20
-        partial_dataset = True
+        num_epochs = 19
+        partial_dataset = False
         if partial_dataset:
             images_per_class = 10
         else:
@@ -94,6 +94,7 @@ if __name__ == '__main__':
                                                                                        ratio=split_ratio, num_classes=num_classes)
             # Also getting RGB images for visualization TODO: make it 'visualize'-wise without breaking the environment
             if visualize:
+                # TODO: fix this
                 train_RGB_imgs = RGB_images[:int(RGB_images.shape[0] * split_ratio)]
                 valid_RGB_imgs = RGB_images[int(RGB_images.shape[0] * split_ratio):]
             else:
@@ -156,8 +157,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210406-103941'
-            old_epochs = 7
+            directory = 'models/RL/20210408-095550'
+            old_epochs = 1
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
@@ -239,7 +240,12 @@ if __name__ == '__main__':
         # Making first column for the sake of readability
         stat_names = ['Epoch', 'Train Avg Reward', 'Train Accuracy', 'Valid Avg Reward', 'Valid Accuracy', 'RCA Accuracy', 'Avg.Class', 'Avg.Move']
         cumulative_accuracy = {}
-        mov_histogram = {}
+        if os.path.exists(stats_dir + 'movement_histogram.json'):
+            with open(stats_dir + 'movement_histogram.json', 'r') as f:
+                mov_histogram = json.load(f)
+                f.close()
+        else:
+            mov_histogram = {}
         for col, name in zip(range(len(stat_names)), stat_names):
             sheet.write(0, col, name, title_style)
         # Train/validation loop
@@ -298,7 +304,7 @@ if __name__ == '__main__':
                 class_attempt = 0
                 mov_attempt = 0
                 valid_environment.environment.episodes_count = 0
-                mov_histogram[epoch] = np.zeros((steps_per_episode,))
+                mov_histogram[epoch] = np.zeros((steps_per_episode,)).tolist()
                 for i in range(1, len_valid + 1):
                     ep_moves = 0
                     terminal = False
@@ -313,7 +319,7 @@ if __name__ == '__main__':
                         if terminal:
                             if action == valid_labels[i-1]:
                                 correct += 1
-                            mov_histogram[ep_moves] += 1
+                            mov_histogram[epoch][ep_moves] += 1
                         ep_reward += reward
                         if int(action) < 10:
                             # Add a classification attempt
