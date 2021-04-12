@@ -42,7 +42,7 @@ if __name__ == '__main__':
         load_checkpoint = True
         same_split = True
         # Train/test parameters
-        num_epochs = 19
+        num_epochs = 15
         partial_dataset = False
         if partial_dataset:
             images_per_class = 10
@@ -158,7 +158,7 @@ if __name__ == '__main__':
         # Agent initialization
         if load_checkpoint:
             directory = 'models/RL/20210408-095550'
-            old_epochs = 1
+            old_epochs = 20
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),

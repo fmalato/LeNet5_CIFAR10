@@ -256,3 +256,48 @@ def plot_mov_histogram(dir_path, filepath, num_timesteps=15, nrows=4, ncols=5):
     fname = os.path.splitext(filepath)[0]
     fig.savefig(fname=dir_path + '{fname}.png'.format(fname=fname))
 
+
+def analyze_distributions(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    predicted = data['predicted']
+    true_lab = data['true lab']
+    baseline = data['baseline']
+    distribs = data['class distr']
+    both_right = []
+    a_right_b_wrong = []
+    a_wrong_b_right = []
+    a_wrong_b_wrong_same_lab = []
+    a_wrong_b_wrong_diff_lab = []
+    almost_right_AwBr = 0
+    almost_right = 0
+    for i in range(len(predicted)):
+        if predicted[i] == true_lab[i] and baseline[i] == true_lab[i]:
+            both_right.append(np.max(distribs[i]))
+        if predicted[i] == true_lab[i] and baseline[i] != true_lab[i]:
+            a_right_b_wrong.append(np.max(distribs[i]))
+        if predicted[i] != true_lab[i] and baseline[i] == true_lab[i]:
+            a_wrong_b_right.append(np.max(distribs[i]))
+            if true_lab[i] in np.argsort(distribs[i])[7:]:
+                almost_right_AwBr += 1
+        if predicted[i] != true_lab[i] and baseline[i] != true_lab[i]:
+            if predicted[i] != baseline[i]:
+                a_wrong_b_wrong_diff_lab.append(np.max(distribs[i]))
+                if true_lab[i] in np.argsort(distribs[i])[7:]:
+                    almost_right += 1
+            else:
+                a_wrong_b_wrong_same_lab.append(np.max(distribs[i]))
+
+    print('Average peak value for A right - B right: {avg}'.format(avg=sum(both_right) / len(both_right)))
+    print('Average peak value for A wrong - B right: {avg}'.format(avg=sum(a_wrong_b_right) / len(a_wrong_b_right)))
+    print('Average peak value for A right - B wrong: {avg}'.format(avg=sum(a_right_b_wrong) / len(a_right_b_wrong)))
+    print('Average peak value for A wrong - B wrong with same label: {avg}'.format(avg=sum(a_wrong_b_wrong_same_lab) / len(a_wrong_b_wrong_same_lab)))
+    print('Average peak value for A wrong - B wrong with different label: {avg}'.format(avg=sum(a_wrong_b_wrong_diff_lab) / len(a_wrong_b_wrong_diff_lab)))
+    print('Percentage of A wrong - B wrong with diff labels where right label is in top-3 positions: {p}%'.format(
+        p=round(almost_right / len(a_wrong_b_wrong_diff_lab), 2) * 100))
+    print('Percentage of A wrong - B right where right label is in top-3 positions: {p}%'.format(
+        p=round(almost_right_AwBr / len(a_wrong_b_right), 2) * 100))
+
+#plot_mov_histogram(dir_path='models/RL/20210408-095550/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
+#analyze_distributions('models/RL/20210402-115459/stats/', 'predicted_labels.json')

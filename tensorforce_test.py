@@ -35,15 +35,16 @@ if __name__ == '__main__':
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
-        visualize = True
+        visualize = False
         # Test parameters
         num_epochs = 1
-        partial_dataset = True
+        partial_dataset = False
         if partial_dataset:
-            images_per_class = 5
+            images_per_class = 50
         else:
             images_per_class = 1000
         heatmap_needed = False
+        histogram_needed = False
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -129,6 +130,7 @@ if __name__ == '__main__':
             predicted_labels = []
             true_labels = []
             baseline_labels = []
+            class_distrib = []
             agent_positions = []
             only_baseline = []
             num_images = len(test_labels)
@@ -146,7 +148,8 @@ if __name__ == '__main__':
                                                   independent=True, deterministic=True)
                     if heatmap_needed:
                         agent_positions.append(environment.environment.agent_pos)
-                    environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
+                    distrib = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
+                    environment.environment.set_agent_classification(distrib)
                     state, terminal, reward = environment.execute(actions=action)
                     if terminal:
                         mov_histogram[0][current_step] += 1
@@ -161,6 +164,8 @@ if __name__ == '__main__':
                             predicted_labels.append(int(action))
                             true_labels.append(int(test_labels[i-1]))
                             baseline_labels.append(int(np.argmax(pred)))
+                            # Marginalized distribution over classification actions
+                            class_distrib.append([x / sum(distrib[:10]) for x in distrib[:10]])
                         else:
                             only_baseline.append((i-1, int(np.argmax(pred))))
                     ep_reward += reward
@@ -176,11 +181,13 @@ if __name__ == '__main__':
             performance['predicted'] = predicted_labels
             performance['true lab'] = true_labels
             performance['baseline'] = baseline_labels
+            performance['class distr'] = class_distrib
             with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
-            with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
-                json.dump(mov_histogram, f)
+            if histogram_needed:
+                with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
+                    json.dump(mov_histogram, f)
             right_when_baseline_wrong = 0
             wrong_when_baseline_right = 0
             agent_baseline_wrong = 0
@@ -208,8 +215,8 @@ if __name__ == '__main__':
             print('Number of times that agent fails when baseline does not: %d / %d' % (wrong_when_baseline_right, len(test_labels)))
             print('Number of times that both agent and baseline are right: %d / %d' % (agent_baseline_right, len(test_labels)))
             print('Number of times that both agent and baseline are wrong: %d / %d' % (agent_baseline_wrong, len(test_labels)))
-            print('    where agent and baseline predict the same class: %d / %d' % (different_class, len(test_labels)))
-            print('    where agent and baseline predict different classes: %d / %d' % (same_class, len(test_labels)))
+            print('    where agent and baseline predict the same class: %d / %d' % (same_class, len(test_labels)))
+            print('    where agent and baseline predict different classes: %d / %d' % (different_class, len(test_labels)))
             print('Number of times that baseline produces correct output when agent does not classify: %d / %d' % (right, len(only_baseline)))
             if heatmap_needed:
                 build_heatmap(agent_positions, dir=directory, show=False)
