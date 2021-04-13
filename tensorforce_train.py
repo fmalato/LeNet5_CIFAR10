@@ -33,19 +33,21 @@ if __name__ == '__main__':
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
-        class_penalty = 0.15
+        class_penalty = 1.0
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
         visualize = False
-        load_checkpoint = True
+        load_checkpoint = False
         same_split = True
         # Train/test parameters
-        num_epochs = 15
+        num_epochs = 5
         partial_dataset = False
         if partial_dataset:
             images_per_class = 10
+            # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
+            same_split = False
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
@@ -157,8 +159,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210408-095550'
-            old_epochs = 20
+            directory = 'models/RL/20210412-153159'
+            old_epochs = 9
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),

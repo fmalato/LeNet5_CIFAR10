@@ -19,7 +19,7 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_right = 14
 
     def __init__(self, dataset, images, labels, max_steps, visualize=False, testing=False, num_classes=10, tile_width=10,
-                 num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01):
+                 num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.dataset = dataset
@@ -60,6 +60,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.correct_class = correct_class
         self.illegal_mov = illegal_mov
         self.same_position = same_position
+        self.non_classified = non_classified
         # Drawing
         self.visualize = visualize
         self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=self.num_layers, pos=(0, 0, 0)) if self.visualize else None
@@ -104,7 +105,7 @@ class DyadicConvnetGymEnv(gym.Env):
 
         if self.agent_pos not in self.ep_visited:
             self.ep_visited.append(self.agent_pos)
-            new_state = 0.01
+            new_state = 0.05
         else:
             new_state = 0.0
 
@@ -112,6 +113,7 @@ class DyadicConvnetGymEnv(gym.Env):
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
                                predicted=action if int(action) < 10 else None, first_step=False)
+
         if self.step_count >= self.max_steps:
             done = True
 
@@ -127,7 +129,9 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.agent_pos == old_pos and action != self.image_class:
             self.mov_reward -= self.same_position
 
-        reward = self.class_reward + self.mov_reward #+ 0.01*self.step_count + new_state
+        reward = self.class_reward + self.mov_reward + 0.01*self.step_count + new_state
+        if self.step_count == self.max_steps and int(action) >= 10:
+            reward -= self.non_classified
         # Adjusting parameters for new observation
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
         self.last_reward = [reward]

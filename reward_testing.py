@@ -20,14 +20,14 @@ if __name__ == '__main__':
         num_classes = 10
         steps_per_episode = 15
         # Reward parameters
-        class_penalty = 0.15
+        class_penalty = 1.0
         correct_class = 2.0
-        illegal_mov = 0.35
+        illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
         visualize = False
         # Train/test parameters
-        images_per_class = 50
+        images_per_class = 10
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -57,7 +57,6 @@ if __name__ == '__main__':
         environment = DyadicConvnetGymEnv(dataset=test_images,
                                           labels=test_labels,
                                           images=RGB_images,
-                                          distributions=distributions,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
                                           testing=True,

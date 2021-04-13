@@ -299,5 +299,5 @@ def analyze_distributions(dir_path, filepath):
     print('Percentage of A wrong - B right where right label is in top-3 positions: {p}%'.format(
         p=round(almost_right_AwBr / len(a_wrong_b_right), 2) * 100))
 
-#plot_mov_histogram(dir_path='models/RL/20210408-095550/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
-#analyze_distributions('models/RL/20210402-115459/stats/', 'predicted_labels.json')
+#plot_mov_histogram(dir_path='models/RL/20210412-153159/stats/', filepath='movement_histogram.json', nrows=2, ncols=4)
+#analyze_distributions('models/RL/20210412-153159/stats/', 'predicted_labels.json')

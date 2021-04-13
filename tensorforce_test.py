@@ -40,7 +40,7 @@ if __name__ == '__main__':
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 50
+            images_per_class = 5
         else:
             images_per_class = 1000
         heatmap_needed = False
@@ -94,11 +94,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210402-115459']
+        dirs = ['models/RL/20210412-153159']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 20
+            old_epochs = 8
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
