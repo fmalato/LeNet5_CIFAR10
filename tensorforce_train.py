@@ -38,24 +38,25 @@ if __name__ == '__main__':
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
-        visualize = False
+        visualize = False    # Training doesn't allow visualization for efficiency purposes
         load_checkpoint = False
-        same_split = True
+        same_split = False
         # Train/test parameters
         num_epochs = 5
-        partial_dataset = False
+        partial_dataset = True
+        layers = [1, 2, 3]
         if partial_dataset:
-            images_per_class = 10
+            images_per_class = 20
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
             same_split = False
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
-                      images_per_class]
+                      images_per_class, layers]
         parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM Units', 'LSTM horizon', 'Steps per Episode',
                             'Policy lr', 'Baseline lr', 'Entropy Reg', 'Dataset Split Ratio', 'Class Penalty',
-                            'Correct Classification', 'Illegal Move', 'Same Position', 'Images per Class']
+                            'Correct Classification', 'Illegal Move', 'Same Position', 'Images per Class', 'Layers']
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -82,7 +83,7 @@ if __name__ == '__main__':
             for img in train_images:
                 sys.stdout.write('\rComputing image {current}/{num_img}'.format(current=idx, num_img=train_images.shape[0]))
                 img = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
-                tmp.append(net.extract_features(img))
+                tmp.append(net.extract_features(img, active_layers=layers, last_layer=4))
                 idx += 1
             # Split training and validation set
             if same_split:
@@ -94,35 +95,27 @@ if __name__ == '__main__':
             else:
                 train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels,
                                                                                        ratio=split_ratio, num_classes=num_classes)
-            # Also getting RGB images for visualization TODO: make it 'visualize'-wise without breaking the environment
-            if visualize:
-                # TODO: fix this
-                train_RGB_imgs = RGB_images[:int(RGB_images.shape[0] * split_ratio)]
-                valid_RGB_imgs = RGB_images[int(RGB_images.shape[0] * split_ratio):]
-            else:
-                train_RGB_imgs = None
-                valid_RGB_imgs = None
             # We don't need them anymore - Bye bye CNN!
             del tmp, distributions
             del net
             print('\nDone.\n')
             #########################################################################
         # Shuffling everything there is to shuffle
-        train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images, labels=train_labels,
-                                                                  RGB_imgs=train_RGB_imgs, visualize=visualize)
-        valid_images, valid_labels, valid_RGB_imgs = shuffle_data(dataset=valid_images, labels=valid_labels,
-                                                                  RGB_imgs=valid_RGB_imgs, visualize=visualize)
+        train_images, train_labels, _ = shuffle_data(dataset=train_images, labels=train_labels,
+                                                     RGB_imgs=None, visualize=False)
+        valid_images, valid_labels, _ = shuffle_data(dataset=valid_images, labels=valid_labels,
+                                                     RGB_imgs=None, visualize=False)
         num_episodes = len(train_labels)
         num_images = len(train_labels)
         len_valid = len(valid_labels)
         # Training environment initialization
         environment = DyadicConvnetGymEnv(dataset=train_images,
                                           labels=train_labels,
-                                          images=train_RGB_imgs,
+                                          images=None,
+                                          layers=layers,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
-                                          testing=False,
-                                          num_layers=4,
+                                          training=True,
                                           class_penalty=class_penalty,
                                           correct_class=correct_class,
                                           illegal_mov=illegal_mov,
@@ -139,11 +132,11 @@ if __name__ == '__main__':
         # Validation environment initialization
         valid_environment = DyadicConvnetGymEnv(dataset=valid_images,
                                                 labels=valid_labels,
-                                                images=valid_RGB_imgs,
+                                                images=None,
+                                                layers=layers,
                                                 max_steps=steps_per_episode,
                                                 visualize=visualize,
-                                                testing=False,
-                                                num_layers=4,
+                                                training=True,
                                                 class_penalty=class_penalty,
                                                 correct_class=correct_class,
                                                 illegal_mov=illegal_mov,
@@ -159,8 +152,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210412-153159'
-            old_epochs = 9
+            directory = 'models/RL/20210413-134205'
+            old_epochs = 12
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
@@ -169,7 +162,7 @@ if __name__ == '__main__':
                                                     agent='ppo',
                                                     max_episode_timesteps=steps_per_episode,
                                                     network=[
-                                                            dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
+                                                        dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
                                                     ],
                                                     baseline=[
                                                         dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')

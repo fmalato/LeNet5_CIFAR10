@@ -30,13 +30,14 @@ if __name__ == '__main__':
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
-        class_penalty = 0.15
+        class_penalty = 1.0
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
         # Control parameters
         visualize = False
         # Test parameters
+        layers = [1, 2, 3]
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
@@ -77,10 +78,10 @@ if __name__ == '__main__':
         environment = DyadicConvnetGymEnv(dataset=test_images,
                                           labels=test_labels,
                                           images=RGB_images,
+                                          layers=layers,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
-                                          testing=True,
-                                          num_layers=4,
+                                          training=False,
                                           class_penalty=class_penalty,
                                           correct_class=correct_class,
                                           illegal_mov=illegal_mov,
@@ -94,11 +95,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210412-153159']
+        dirs = ['models/RL/20210413-134205']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 8
+            old_epochs = 12
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -172,10 +173,12 @@ if __name__ == '__main__':
                     current_step += 1
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
-                sys.stdout.write('\rTest: Episode {ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}%'.format(ep=i,
-                                                                                                                               cr=round(avg_reward, 3),
-                                                                                                                               ok=round((correct / i) * 100, 2),
-                                                                                                                               rcaok=round((correct / class_attempt) * 100, 2)))
+                sys.stdout.write('\rTest: Episode {ep} - Last ep. reward: {last_ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}%'
+                                 .format(ep=i,
+                                         last_ep=round(ep_reward, 2),
+                                         cr=round(avg_reward, 3),
+                                         ok=round((correct / i) * 100, 2),
+                                         rcaok=round((correct / class_attempt) * 100, 2)))
                 sys.stdout.flush()
             print('\n')
             performance['predicted'] = predicted_labels

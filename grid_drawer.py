@@ -6,7 +6,7 @@ import numpy as np
 class Square:
 
     def __init__(self, position, width=10):
-        assert len(position) == 3, "argument 'position' must be a (x, y) tuple"
+        assert len(position) == 3, "argument 'position' must be a (layer, x, y) tuple"
         self.position = position
         self.width = width
 
@@ -34,14 +34,17 @@ class Grid:
 
 class AgentSprite:
 
-    def __init__(self, rect_width, num_layers, pos):
+    def __init__(self, rect_width, layers, pos):
         self.position = pos
         self.rect_width = rect_width
-        self.num_layers = num_layers
+        self.layers = layers
+        self.num_layers = len(self.layers)
+        self.max_layer = np.max(self.layers)
+        self.min_layer = np.min(self.layers)
         self.neighborhood = []
-        if self.position[0] < self.num_layers - 1:
+        if self.position[0] < self.max_layer:
             self.neighborhood.append((self.position[0] + 1, int(self.position[1] / 2), int(self.position[2] / 2)))
-        if self.position[0] > 0:
+        if self.position[0] > self.min_layer:
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2]))
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1] + 1, 2 * self.position[2]))
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2] + 1))
@@ -50,9 +53,9 @@ class AgentSprite:
     def move(self, position):
         self.position = position
         self.neighborhood = []
-        if self.position[0] < self.num_layers - 1:
+        if self.position[0] < self.max_layer:
             self.neighborhood.append((self.position[0] + 1, int(self.position[1]/2), int(self.position[2]/2)))
-        if self.position[0] > 0:
+        if self.position[0] > self.min_layer:
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2]))
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1] + 1, 2 * self.position[2]))
             self.neighborhood.append((self.position[0] - 1, 2 * self.position[1], 2 * self.position[2] + 1))
@@ -66,13 +69,14 @@ class AgentSprite:
 
 class Drawer:
 
-    def __init__(self, agent, num_layers, tile_width):
+    def __init__(self, agent, layers, tile_width):
         self.agent = agent
         # TODO: find a more general way
         self.class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                             'dog', 'frog', 'horse', 'ship', 'truck']
         # Knowing that it's a dyadic decomposition, there's no need to specify the shape of every layer
-        self.num_layers = num_layers
+        self.layers = layers
+        self.num_layers = 5
         self.grids = {}
         self.tile_width = tile_width
         self.fig, self.ax = plt.subplots(1, self.num_layers + 1, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 2, 1, 0.5, 0.25, 2]})
@@ -87,7 +91,10 @@ class Drawer:
             layer += 1
         index = 0
         for key in self.grids.keys():
-            img = self.render_grid(key=key)
+            if index in self.layers:
+                img = self.render_grid(key=key, active=True)
+            else:
+                img = self.render_grid(key=key, active=False)
             self.ax[index].imshow(img)
             index += 1
         self.current_image = self.ax[self.num_layers].imshow(img)
@@ -134,8 +141,12 @@ class Drawer:
             self.fig.canvas.blit(ax.bbox)
         plt.pause(1.0 if first_step else 0.2)
 
-    def render_grid(self, key):
+    def render_grid(self, key, active=True):
         img = np.zeros((key * self.tile_width + 1, key * self.tile_width + 1, 3))
+        if not active:
+            img[:, :, 0] = 1.0
+            img[:, :, 1] = 0.5
+            img[:, :, 2] = 0.0
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
                 if i % 10 == 0 or j % 10 == 0:

@@ -18,15 +18,18 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 13
         up_bottom_right = 14
 
-    def __init__(self, dataset, images, labels, max_steps, visualize=False, testing=False, num_classes=10, tile_width=10,
-                 num_layers=5, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0):
+    def __init__(self, dataset, images, labels, layers, max_steps, visualize=False, training=False, num_classes=10, tile_width=10,
+                 class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.dataset = dataset
         self.images = images if visualize else None
         self.labels = labels
+        self.layers = layers
         self.dataset_length = len(self.dataset)
-        self.num_layers = num_layers
+        self.num_layers = len(self.layers)
+        self.max_layer = np.max(self.layers)
+        self.min_layer = np.min(self.layers)
         # Extracting current training image from dataset
         self.train_image = None
         self.image_class = None
@@ -54,7 +57,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.mov_reward = 0.0
         self.last_reward = [0.0]
         self.last_action = None
-        self.testing = testing
+        self.training = training
         # Reward setup
         self.class_penalty = class_penalty
         self.correct_class = correct_class
@@ -62,9 +65,14 @@ class DyadicConvnetGymEnv(gym.Env):
         self.same_position = same_position
         self.non_classified = non_classified
         # Drawing
-        self.visualize = visualize
-        self.agent_sprite = AgentSprite(rect_width=tile_width, num_layers=self.num_layers, pos=(0, 0, 0)) if self.visualize else None
-        self.drawer = Drawer(self.agent_sprite, num_layers=self.num_layers+1, tile_width=tile_width) if self.visualize else None
+        if training:
+            self.visualize = False
+            self.agent_sprite = None
+            self.drawer = None
+        else:
+            self.visualize = visualize
+            self.agent_sprite = AgentSprite(rect_width=tile_width, layers=self.layers, pos=(0, 0, 0)) if self.visualize else None
+            self.drawer = Drawer(self.agent_sprite, layers=self.layers, tile_width=tile_width) if self.visualize else None
 
     def step(self, action):
         self.step_count += 1
@@ -74,27 +82,27 @@ class DyadicConvnetGymEnv(gym.Env):
         old_pos = self.agent_pos
         # New agent position based on the movement action
         if action == self.actions.down:
-            if self.agent_pos[0] < self.num_layers - 1:
+            if self.agent_pos[0] < self.max_layer:
                 self.agent_pos = (self.agent_pos[0] + 1,
                                   int(self.agent_pos[1]/2),
                                   int(self.agent_pos[2]/2))
         elif action == self.actions.up_top_left:
-            if self.agent_pos[0] > 0:
+            if self.agent_pos[0] > self.min_layer:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2])
         elif action == self.actions.up_top_right:
-            if self.agent_pos[0] > 0:
+            if self.agent_pos[0] > self.min_layer:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2])
         elif action == self.actions.up_bottom_left:
-            if self.agent_pos[0] > 0:
+            if self.agent_pos[0] > self.min_layer:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1],
                                   2*self.agent_pos[2] + 1)
         elif action == self.actions.up_bottom_right:
-            if self.agent_pos[0] > 0:
+            if self.agent_pos[0] > self.min_layer:
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
@@ -118,10 +126,10 @@ class DyadicConvnetGymEnv(gym.Env):
             done = True
 
         # Punishing the agent for illegal actions
-        if old_pos[0] == 0 and action in [self.actions.up_bottom_right, self.actions.up_top_right,
-                                          self.actions.up_top_left, self.actions.up_bottom_left]:
+        if old_pos[0] == self.layers[0] and action in [self.actions.up_bottom_right, self.actions.up_top_right,
+                                                       self.actions.up_top_left, self.actions.up_bottom_left]:
             self.mov_reward = -self.illegal_mov
-        elif old_pos[0] == self.num_layers - 1 and action == self.actions.down:
+        elif old_pos[0] == self.layers[self.num_layers - 1] and action == self.actions.down:
             self.mov_reward = -self.illegal_mov
         else:
             self.mov_reward = 0.0
@@ -149,7 +157,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
-        starting_layer = np.random.randint(0, self.num_layers - 1)
+        starting_layer = np.random.choice(self.layers)
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         self.agent_pos = (starting_layer, starting_x, starting_y)

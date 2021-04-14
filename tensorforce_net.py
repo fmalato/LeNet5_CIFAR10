@@ -24,14 +24,16 @@ class DyadicConvNet(models.Sequential):
         ])
         self.build(input_shape=input_shape)
 
-    def extract_features(self, image):
+    def extract_features(self, image, active_layers, last_layer=4):
         features = {}
         output = image
         layer_index = 0
         for layer in self.layers:
             output = layer(output)
             if 'pooling' in layer.name:
-                features[layer_index] = np.reshape(output.numpy(), (output.shape[1], output.shape[2], output.shape[3]))
+                # We only consider layers that we use + last layer for global representation. Other data is useless.
+                if layer_index in active_layers or layer_index == last_layer:
+                    features[layer_index] = np.reshape(output.numpy(), (output.shape[1], output.shape[2], output.shape[3]))
                 layer_index += 1
 
         return features

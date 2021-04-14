@@ -208,7 +208,7 @@ def shuffle_data(dataset, labels, RGB_imgs, visualize=False):
         if visualize:
             shuffled_RGB.append(RGB_imgs[perm[i]])
 
-    return np.array(shuffled_data), np.array(shuffled_labels), np.array(shuffled_RGB)
+    return np.array(shuffled_data), np.array(shuffled_labels), (np.array(shuffled_RGB) if visualize else None)
 
 
 def build_heatmap(positions, dir, scale_factor=16, show=True):
@@ -299,5 +299,5 @@ def analyze_distributions(dir_path, filepath):
     print('Percentage of A wrong - B right where right label is in top-3 positions: {p}%'.format(
         p=round(almost_right_AwBr / len(a_wrong_b_right), 2) * 100))
 
-#plot_mov_histogram(dir_path='models/RL/20210412-153159/stats/', filepath='movement_histogram.json', nrows=2, ncols=4)
-#analyze_distributions('models/RL/20210412-153159/stats/', 'predicted_labels.json')
+#plot_mov_histogram(dir_path='models/RL/20210413-134205/stats/', filepath='movement_histogram.json', nrows=2, ncols=5)
+#analyze_distributions('models/RL/20210413-134205/stats/', 'predicted_labels.json')
