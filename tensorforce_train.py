@@ -17,7 +17,7 @@ from utils import split_dataset, split_dataset_idxs, n_images_per_class_new, shu
 
 
 if __name__ == '__main__':
-    with tf.device('/device:CPU:0'):
+    with tf.device('/device:GPU:0'):
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
@@ -27,7 +27,7 @@ if __name__ == '__main__':
         num_classes = 10
         lstm_horizon = 5
         lstm_units = 128
-        steps_per_episode = 15
+        steps_per_episode = 15    # Scale movement reward as well
         policy_lr = 1e-4
         baseline_lr = 1e-3
         e_r = 0.2
@@ -37,31 +37,34 @@ if __name__ == '__main__':
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
+        non_classified = 3.0
+        step_reward_multiplier = 0.01
         # Control parameters
         visualize = False    # Training doesn't allow visualization for efficiency purposes
         load_checkpoint = False
-        same_split = False
+        same_split = True
         # Train/test parameters
-        num_epochs = 5
-        partial_dataset = True
-        layers = [1, 2, 3]
+        num_epochs = 15
+        partial_dataset = False
+        layers = [0, 1, 2, 3]
         if partial_dataset:
-            images_per_class = 20
+            images_per_class = 5
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
             same_split = False
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
-                      images_per_class, layers]
+                      non_classified, images_per_class, "{x}".format(x=layers)]
         parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM Units', 'LSTM horizon', 'Steps per Episode',
                             'Policy lr', 'Baseline lr', 'Entropy Reg', 'Dataset Split Ratio', 'Class Penalty',
-                            'Correct Classification', 'Illegal Move', 'Same Position', 'Images per Class', 'Layers']
+                            'Correct Classification', 'Illegal Move', 'Same Position', 'Non Classified',
+                            'Images per Class', 'Layers']
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
-            net.load_weights('models/model_CIFAR10/20210303-125114.h5')
+            net.load_weights('models/model_CIFAR10/20210421-123951.h5')
             print('Computing whole dataset features...')
             # Dataset initialization - we don't need test data here
             (train_images, train_labels), (_, _) = datasets.cifar10.load_data()
@@ -101,10 +104,10 @@ if __name__ == '__main__':
             print('\nDone.\n')
             #########################################################################
         # Shuffling everything there is to shuffle
-        train_images, train_labels, _ = shuffle_data(dataset=train_images, labels=train_labels,
-                                                     RGB_imgs=None, visualize=False)
-        valid_images, valid_labels, _ = shuffle_data(dataset=valid_images, labels=valid_labels,
-                                                     RGB_imgs=None, visualize=False)
+        train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images, labels=train_labels,
+                                                                  RGB_imgs=None, visualize=False)
+        valid_images, valid_labels, valid_RGB_imgs = shuffle_data(dataset=valid_images, labels=valid_labels,
+                                                                  RGB_imgs=None, visualize=False)
         num_episodes = len(train_labels)
         num_images = len(train_labels)
         len_valid = len(valid_labels)
@@ -119,7 +122,9 @@ if __name__ == '__main__':
                                           class_penalty=class_penalty,
                                           correct_class=correct_class,
                                           illegal_mov=illegal_mov,
-                                          same_position=same_position
+                                          same_position=same_position,
+                                          non_classified=non_classified,
+                                          step_reward_multiplier=step_reward_multiplier
                                           )
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
@@ -140,7 +145,9 @@ if __name__ == '__main__':
                                                 class_penalty=class_penalty,
                                                 correct_class=correct_class,
                                                 illegal_mov=illegal_mov,
-                                                same_position=same_position
+                                                same_position=same_position,
+                                                non_classified=non_classified,
+                                                step_reward_multiplier=step_reward_multiplier
                                                 )
         num_actions = len(valid_environment.actions)
         valid_environment = Environment.create(environment=valid_environment,
@@ -152,8 +159,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210413-134205'
-            old_epochs = 12
+            directory = 'models/RL/20210419-094359'
+            old_epochs = 28
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
@@ -349,19 +356,17 @@ if __name__ == '__main__':
                 # Shuffling data at each epoch
                 train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images,
                                                                           labels=train_labels,
-                                                                          RGB_imgs=train_RGB_imgs,
+                                                                          RGB_imgs=None,
                                                                           visualize=visualize)
                 valid_images, valid_labels, valid_RGB_imgs = shuffle_data(dataset=valid_images,
                                                                           labels=valid_labels,
-                                                                          RGB_imgs=valid_RGB_imgs,
+                                                                          RGB_imgs=None,
                                                                           visualize=visualize)
                 # Setting new permutation of data on envs
                 environment.environment.dataset = train_images
                 environment.environment.labels = train_labels
-                environment.environment.images = train_RGB_imgs
                 valid_environment.environment.dataset = valid_images
                 valid_environment.environment.labels = valid_labels
-                valid_environment.environment.images = valid_RGB_imgs
                 print('\n')
             # Save excel sheet at the end of training
             idx = 3

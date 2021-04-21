@@ -192,7 +192,8 @@ def split_dataset(dataset, labels, ratio=0.8, num_classes=10, save_idxs=False):
 def split_dataset_idxs(dataset, labels, train_idxs, valid_idxs):
     print('\nLoading old splits...')
     print('\nOld training: {x}..., old valid: {y}...'.format(x=train_idxs[:10], y=valid_idxs[:10]))
-
+    dataset = list(dataset)
+    labels = list(labels)
     return [dataset[x] for x in train_idxs], [dataset[x] for x in valid_idxs], \
            [labels[x] for x in train_idxs], [labels[x] for x in valid_idxs]
 
@@ -299,5 +300,23 @@ def analyze_distributions(dir_path, filepath):
     print('Percentage of A wrong - B right where right label is in top-3 positions: {p}%'.format(
         p=round(almost_right_AwBr / len(a_wrong_b_right), 2) * 100))
 
+
+def error_corr_matrix(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    predicted = data['predicted']
+    true_lab = data['true lab']
+    num_classes = len(data['class distr'][0])
+    corr_matrix = np.zeros((num_classes, num_classes), dtype=np.int)
+    for pred, true in zip(predicted, true_lab):
+        if pred != true:
+            corr_matrix[pred, true] += 1
+    print(corr_matrix)
+
+
 #plot_mov_histogram(dir_path='models/RL/20210413-134205/stats/', filepath='movement_histogram.json', nrows=2, ncols=5)
 #analyze_distributions('models/RL/20210413-134205/stats/', 'predicted_labels.json')
+"""error_corr_matrix('models/RL/20210402-115459/stats/', 'predicted_labels.json')
+print('\n')
+error_corr_matrix('models/RL/20210414-163904/stats/', 'predicted_labels.json')"""

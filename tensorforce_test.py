@@ -25,8 +25,8 @@ if __name__ == '__main__':
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-4
-        baseline_lr = 1e-3
+        policy_lr = 5e-6
+        baseline_lr = 1e-4
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -34,10 +34,12 @@ if __name__ == '__main__':
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
+        non_classified = 3.0
+        step_reward_multiplier = 0.01
         # Control parameters
         visualize = False
         # Test parameters
-        layers = [1, 2, 3]
+        layers = [0, 1, 2, 3]
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
@@ -50,6 +52,7 @@ if __name__ == '__main__':
         # Network initialization
         with tf.device('/device:CPU:0'):
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
+            # TODO: change it as you get statistics
             net.load_weights('models/model_CIFAR10/20210303-125114.h5')
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
@@ -68,7 +71,7 @@ if __name__ == '__main__':
                 sys.stdout.write(
                     '\rComputing image {current}/{num_img}'.format(current=idx, num_img=test_images.shape[0]))
                 image = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
-                tmp.append(net.extract_features(image))
+                tmp.append(net.extract_features(image, active_layers=layers, last_layer=4))
                 idx += 1
             test_images = copy.deepcopy(tmp)
             del train_images, train_labels
@@ -85,7 +88,9 @@ if __name__ == '__main__':
                                           class_penalty=class_penalty,
                                           correct_class=correct_class,
                                           illegal_mov=illegal_mov,
-                                          same_position=same_position
+                                          same_position=same_position,
+                                          non_classified=non_classified,
+                                          step_reward_multiplier=step_reward_multiplier
                                           )
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
@@ -95,11 +100,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210413-134205']
+        dirs = ['models/RL/20210419-094359']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 12
+            old_epochs = 27
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -161,7 +166,6 @@ if __name__ == '__main__':
                             pred = net(pred)
                         if int(action) < 10:
                             # Add a classification attempt
-                            class_attempt += 1
                             predicted_labels.append(int(action))
                             true_labels.append(int(test_labels[i-1]))
                             baseline_labels.append(int(np.argmax(pred)))
@@ -169,6 +173,8 @@ if __name__ == '__main__':
                             class_distrib.append([x / sum(distrib[:10]) for x in distrib[:10]])
                         else:
                             only_baseline.append((i-1, int(np.argmax(pred))))
+                    if int(action) < 10:
+                        class_attempt += 1
                     ep_reward += reward
                     current_step += 1
                 rewards.append(ep_reward)

@@ -19,7 +19,8 @@ class DyadicConvnetGymEnv(gym.Env):
         up_bottom_right = 14
 
     def __init__(self, dataset, images, labels, layers, max_steps, visualize=False, training=False, num_classes=10, tile_width=10,
-                 class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0):
+                 class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0,
+                 step_reward_multiplier=0.01):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
         self.dataset = dataset
@@ -64,6 +65,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.illegal_mov = illegal_mov
         self.same_position = same_position
         self.non_classified = non_classified
+        self.step_reward_multiplier = step_reward_multiplier
         # Drawing
         if training:
             self.visualize = False
@@ -137,7 +139,7 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.agent_pos == old_pos and action != self.image_class:
             self.mov_reward -= self.same_position
 
-        reward = self.class_reward + self.mov_reward + 0.01*self.step_count + new_state
+        reward = self.class_reward + self.mov_reward + self.step_reward_multiplier*self.step_count + new_state
         if self.step_count == self.max_steps and int(action) >= 10:
             reward -= self.non_classified
         # Adjusting parameters for new observation
