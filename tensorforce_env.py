@@ -162,6 +162,8 @@ class DyadicConvnetGymEnv(gym.Env):
         starting_layer = np.random.choice(self.layers)
         starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
         starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
+        #starting_x = pow(2, len(self.layers) - starting_layer - 1)
+        #starting_y = pow(2, len(self.layers) - starting_layer - 1)
         self.agent_pos = (starting_layer, starting_x, starting_y)
         self.ep_visited = []
         self.ep_visited.append(self.agent_pos)

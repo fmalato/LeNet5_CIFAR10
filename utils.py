@@ -3,9 +3,12 @@ import json
 import random
 import ast
 import os
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+from pylab import cm, hsv
 
 
 # Check execution time of a line/block of lines
@@ -212,28 +215,40 @@ def shuffle_data(dataset, labels, RGB_imgs, visualize=False):
     return np.array(shuffled_data), np.array(shuffled_labels), (np.array(shuffled_RGB) if visualize else None)
 
 
-def build_heatmap(positions, dir, scale_factor=16, show=True):
+def build_heatmap(positions, dir, show=True):
     if not os.path.exists(dir + '/heatmaps/'):
         os.mkdir(dir + '/heatmaps/')
     # A 16x16 image is not readable and is heavily blurred when rescaled
     env = {}
-    env[0] = np.zeros((16*scale_factor, 16*scale_factor))
-    env[1] = np.zeros((8*scale_factor, 8*scale_factor))
-    env[2] = np.zeros((4*scale_factor, 4*scale_factor))
-    env[3] = np.zeros((2*scale_factor, 2*scale_factor))
+    env[0] = np.zeros((16, 16), dtype=np.int)
+    env[1] = np.zeros((8, 8), dtype=np.int)
+    env[2] = np.zeros((4, 4), dtype=np.int)
+    env[3] = np.zeros((2, 2), dtype=np.int)
     for el in positions:
-        for x in range(el[1] * scale_factor, (el[1] + 1) * scale_factor):
-            for y in range(el[2] * scale_factor, (el[2] + 1) * scale_factor):
-                env[el[0]][x][y] += 1
-
-    abs_max = np.max([np.max(env[key]) for key in env.keys()])
+        env[el[0]][el[1], el[2]] += 1
 
     for key in env.keys():
-        env[key] /= abs_max
+        fig, ax = plt.subplots()
+        im = ax.imshow(env[key])
+        xticks = np.arange(int(env[key].shape[0]))
+        yticks = np.arange(int(env[key].shape[1]))
+        ax.set_xticks(xticks)
+        ax.set_yticks(yticks)
+
+        ax.set_xticklabels(xticks)
+        ax.set_yticklabels(yticks)
+
+        for i in range(len(xticks)):
+            for j in range(len(yticks)):
+                text = ax.text(j, i, env[key][i, j],
+                               ha="center", va="center", color="black")
+
+        ax.set_title("Layer {x}".format(x=key))
+        fig.tight_layout()
         if show:
-            plt.imshow(env[key], cmap='hot')
-        plt.imsave(dir + '/heatmaps/{s}.png'.format(s=key), env[key])
-        plt.show()
+            plt.show()
+
+        fig.savefig(dir + '/heatmaps/{s}.png'.format(s=key))
 
 
 def plot_mov_histogram(dir_path, filepath, num_timesteps=15, nrows=4, ncols=5):
@@ -302,6 +317,8 @@ def analyze_distributions(dir_path, filepath):
 
 
 def error_corr_matrix(dir_path, filepath):
+    class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                   'dog', 'frog', 'horse', 'ship', 'truck']
     with open(dir_path + filepath, 'r') as f:
         data = json.load(f)
         f.close()
@@ -312,11 +329,76 @@ def error_corr_matrix(dir_path, filepath):
     for pred, true in zip(predicted, true_lab):
         if pred != true:
             corr_matrix[pred, true] += 1
-    print(corr_matrix)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(corr_matrix)
+
+    ax.set_xticks(np.arange(len(class_names)))
+    ax.set_yticks(np.arange(len(class_names)))
+
+    ax.set_xticklabels(class_names)
+    ax.set_yticklabels(class_names)
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            text = ax.text(j, i, corr_matrix[i, j],
+                           ha="center", va="center", color="black")
+
+    ax.set_title("Error correlation matrix")
+    fig.tight_layout()
+    plt.show()
+    fig.savefig(dir_path + "error_corr_matrix.png")
 
 
-#plot_mov_histogram(dir_path='models/RL/20210413-134205/stats/', filepath='movement_histogram.json', nrows=2, ncols=5)
-#analyze_distributions('models/RL/20210413-134205/stats/', 'predicted_labels.json')
-"""error_corr_matrix('models/RL/20210402-115459/stats/', 'predicted_labels.json')
-print('\n')
-error_corr_matrix('models/RL/20210414-163904/stats/', 'predicted_labels.json')"""
+def classification_position(dir_path, filepath, ):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    predicted = data['predicted']
+    true_lab = data['true lab']
+    positions = data['class position']
+    num_pred = len(predicted)
+    pred_in_pos = {}
+    for i in range(num_pred):
+        if positions[i] not in pred_in_pos:
+            pred_in_pos[positions[i]] = [0, 0]
+        if predicted[i] == true_lab[i]:
+            pred_in_pos[positions[i]][0] += 1
+        pred_in_pos[positions[i]][1] += 1
+
+    """xs = []
+    ys = []
+    zs = []
+    colors = []
+    for key in pred_in_pos.keys():
+        k = re.sub('[()]', '', key)
+        res = tuple(map(int, k.split(', ')))
+        xs.append(res[0])
+        ys.append(res[1])
+        zs.append(res[2])
+        colors.append(pred_in_pos[key][1])
+
+    fig = plt.figure(figsize=(8, 6))
+
+    ax = fig.add_subplot(111, projection='3d')
+    colmap = cm.ScalarMappable(cmap='hot')
+    colmap.set_array(np.array(colors))
+
+    yg = ax.scatter(xs, ys, zs, c=np.array(colors) / max(np.array(colors)), marker='s')
+    cb = fig.colorbar(colmap)
+
+    ax.set_xlabel('Layer')
+    ax.set_ylabel('Column')
+    ax.set_zlabel('Row')
+
+    plt.show()"""
+
+    print(pred_in_pos)
+
+#plot_mov_histogram(dir_path='models/RL/20210421-130304/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
+#analyze_distributions('models/RL/20210421-130304/stats/', 'predicted_labels.json')
+#error_corr_matrix('models/RL/20210421-130304/stats/', 'predicted_labels.json')
+#classification_position('models/RL/20210421-130304/stats/', 'predicted_labels.json')

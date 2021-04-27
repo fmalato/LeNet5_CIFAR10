@@ -139,6 +139,7 @@ class Drawer:
             self.predicted_label.set_text('Predicted: None')
         for ax in self.ax:
             self.fig.canvas.blit(ax.bbox)
+        # TODO: investigate flashing
         plt.pause(1.0 if first_step else 0.2)
 
     def render_grid(self, key, active=True):

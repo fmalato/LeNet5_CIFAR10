@@ -17,7 +17,7 @@ from utils import split_dataset, split_dataset_idxs, n_images_per_class_new, shu
 
 
 if __name__ == '__main__':
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:CPU:0'):
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
         # Network hyperparameters
@@ -41,14 +41,14 @@ if __name__ == '__main__':
         step_reward_multiplier = 0.01
         # Control parameters
         visualize = False    # Training doesn't allow visualization for efficiency purposes
-        load_checkpoint = False
+        load_checkpoint = True
         same_split = True
         # Train/test parameters
-        num_epochs = 15
+        num_epochs = 7
         partial_dataset = False
-        layers = [0, 1, 2, 3]
+        layers = [2, 3]
         if partial_dataset:
-            images_per_class = 5
+            images_per_class = 10
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
             same_split = False
         else:
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                             'Images per Class', 'Layers']
         ########################### PREPROCESSING ##############################
         # Network initialization
-        with tf.device('/device:CPU:0'):
+        with tf.device('/device:GPU:0'):
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
             net.load_weights('models/model_CIFAR10/20210421-123951.h5')
             print('Computing whole dataset features...')
@@ -159,9 +159,13 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210419-094359'
-            old_epochs = 28
+            directory = 'models/RL/20210426-131450'
+            old_epochs = 8
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
+            """summarizer=dict(
+                                                        directory='data/summaries',
+                                                        summaries=['action-value', 'entropy', 'reward', 'distribution']
+                                                    ),"""
             agent = ProximalPolicyOptimization.load(directory=directory + '/checkpoints/',
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
                                                     format='hdf5',
@@ -176,10 +180,7 @@ if __name__ == '__main__':
                                                     ],
                                                     baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                                     # TODO: Huge file - find minimum number of parameters
-                                                    summarizer=dict(
-                                                        directory='data/summaries',
-                                                        summaries=['action-value', 'entropy', 'reward', 'distribution']
-                                                    ),
+                                                    summarizer=None,
                                                     learning_rate=policy_lr,
                                                     batch_size=batch_size,
                                                     tracking=['distribution'],
@@ -204,10 +205,7 @@ if __name__ == '__main__':
                                                       ],
                                                       baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                                       # TODO: Huge file - find minimum number of parameters
-                                                      summarizer=dict(
-                                                          directory='data/summaries',
-                                                          summaries=['action-value', 'entropy', 'reward', 'distribution']
-                                                      ),
+                                                      summarizer=None,
                                                       learning_rate=policy_lr,
                                                       batch_size=batch_size,
                                                       tracking=['distribution'],

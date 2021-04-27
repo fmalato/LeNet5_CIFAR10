@@ -25,8 +25,8 @@ if __name__ == '__main__':
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 5e-6
-        baseline_lr = 1e-4
+        policy_lr = 1e-5
+        baseline_lr = 1e-3
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -39,21 +39,20 @@ if __name__ == '__main__':
         # Control parameters
         visualize = False
         # Test parameters
-        layers = [0, 1, 2, 3]
+        layers = [2, 3]
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 5
+            images_per_class = 10
         else:
             images_per_class = 1000
-        heatmap_needed = False
-        histogram_needed = False
+        heatmap_needed = True
+        histogram_needed = True
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
-            # TODO: change it as you get statistics
-            net.load_weights('models/model_CIFAR10/20210303-125114.h5')
+            net.load_weights('models/model_CIFAR10/20210421-123951.h5')
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
             test_images = np.array(test_images, dtype=np.float32)
@@ -100,11 +99,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210419-094359']
+        dirs = ['models/RL/20210426-131450']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 27
+            old_epochs = 15
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -129,6 +128,7 @@ if __name__ == '__main__':
             # Parameters for test loop
             episode = 0
             correct = 0
+            base_correct = 0
             class_attempt = 0
             not_classified = 0
             rewards = []
@@ -139,6 +139,7 @@ if __name__ == '__main__':
             class_distrib = []
             agent_positions = []
             only_baseline = []
+            class_pos = []
             num_images = len(test_labels)
             mov_histogram = {}
             mov_histogram[0] = np.zeros(steps_per_episode).tolist()
@@ -171,7 +172,12 @@ if __name__ == '__main__':
                             baseline_labels.append(int(np.argmax(pred)))
                             # Marginalized distribution over classification actions
                             class_distrib.append([x / sum(distrib[:10]) for x in distrib[:10]])
+                            class_pos.append(str(environment.environment.agent_pos))
                         else:
+                            #class_dis = [x / sum(distrib[:10]) for x in distrib[:10]]
+                            if np.argmax(pred) == test_labels[i - 1]:
+                                base_correct += 1
+                            #class_attempt += 1
                             only_baseline.append((i-1, int(np.argmax(pred))))
                     if int(action) < 10:
                         class_attempt += 1
@@ -179,18 +185,22 @@ if __name__ == '__main__':
                     current_step += 1
                 rewards.append(ep_reward)
                 avg_reward = np.sum(rewards) / len(rewards)
-                sys.stdout.write('\rTest: Episode {ep} - Last ep. reward: {last_ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}%'
+                if class_attempt == 0:
+                    class_attempt = 1
+                sys.stdout.write('\rTest: Episode {ep} - Last ep. reward: {last_ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}% - w/Baseline: {bok}%'
                                  .format(ep=i,
                                          last_ep=round(ep_reward, 2),
                                          cr=round(avg_reward, 3),
                                          ok=round((correct / i) * 100, 2),
-                                         rcaok=round((correct / class_attempt) * 100, 2)))
+                                         rcaok=round((correct / class_attempt) * 100, 2),
+                                         bok=round(((correct+base_correct) / i) * 100, 2)))
                 sys.stdout.flush()
             print('\n')
             performance['predicted'] = predicted_labels
             performance['true lab'] = true_labels
             performance['baseline'] = baseline_labels
             performance['class distr'] = class_distrib
+            performance['class position'] = class_pos
             with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
@@ -216,10 +226,18 @@ if __name__ == '__main__':
                         different_class += 1
                     else:
                         same_class += 1
-                right = 0
+            right = 0
+            base_stats = {}
+            with open(directory + '/stats/only_baseline.json', 'w+') as f:
+                base_stats['baseline pred'] = only_baseline
+                ground_truth = []
                 for el in only_baseline:
                     if el[1] == test_labels[el[0]]:
                         right += 1
+                    ground_truth.append(int(test_labels[el[0]]))
+                base_stats['ground truth'] = ground_truth
+                json.dump(base_stats, f)
+                f.close()
             print('Number of times that agent improves baseline: %d / %d' % (right_when_baseline_wrong, len(test_labels)))
             print('Number of times that agent fails when baseline does not: %d / %d' % (wrong_when_baseline_right, len(test_labels)))
             print('Number of times that both agent and baseline are right: %d / %d' % (agent_baseline_right, len(test_labels)))
