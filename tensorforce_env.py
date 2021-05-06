@@ -125,7 +125,8 @@ class DyadicConvnetGymEnv(gym.Env):
                                predicted=action if int(action) < 10 else None, first_step=False)
 
         if self.step_count >= self.max_steps:
-            done = True
+            if self.training:
+                done = True
 
         # Punishing the agent for illegal actions
         if old_pos[0] == self.layers[0] and action in [self.actions.up_bottom_right, self.actions.up_top_right,
@@ -160,8 +161,8 @@ class DyadicConvnetGymEnv(gym.Env):
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)
         starting_layer = np.random.choice(self.layers)
-        starting_x = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
-        starting_y = np.random.randint(0, self.features[starting_layer].shape[0] - 1) if starting_layer != 4 else 0
+        starting_x = np.random.randint(0, self.features[starting_layer].shape[0]) if starting_layer != 4 else 0
+        starting_y = np.random.randint(0, self.features[starting_layer].shape[0]) if starting_layer != 4 else 0
         #starting_x = pow(2, len(self.layers) - starting_layer - 1)
         #starting_y = pow(2, len(self.layers) - starting_layer - 1)
         self.agent_pos = (starting_layer, starting_x, starting_y)

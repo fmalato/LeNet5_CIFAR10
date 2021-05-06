@@ -25,9 +25,9 @@ if __name__ == '__main__':
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-5
-        baseline_lr = 1e-3
-        e_r = 0.2
+        policy_lr = 1e-6
+        baseline_lr = 1e-4
+        e_r = 0.1
         split_ratio = 0.8
         # Reward parameters
         class_penalty = 1.0
@@ -39,11 +39,11 @@ if __name__ == '__main__':
         # Control parameters
         visualize = False
         # Test parameters
-        layers = [2, 3]
+        layers = [0, 1, 2, 3]
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 10
+            images_per_class = 1
         else:
             images_per_class = 1000
         heatmap_needed = True
@@ -99,11 +99,11 @@ if __name__ == '__main__':
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210426-131450']
+        dirs = ['models/RL/20210428-125328']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 15
+            old_epochs = 27
             agent = Agent.load(directory=check_dir,
                                filename='agent-{oe}'.format(oe=old_epochs-1),
                                format='hdf5',
@@ -133,11 +133,14 @@ if __name__ == '__main__':
             not_classified = 0
             rewards = []
             performance = {}
-            predicted_labels = []
-            true_labels = []
-            baseline_labels = []
-            class_distrib = []
-            agent_positions = []
+            predicted_labels = {}
+            true_labels = {}
+            baseline_labels = {}
+            class_distrib = {}
+            agent_positions = {}
+            actions = {}
+            ep_pos = []
+            ep_actions = []
             only_baseline = []
             class_pos = []
             num_images = len(test_labels)
@@ -150,12 +153,19 @@ if __name__ == '__main__':
                 state = environment.reset()
                 internals = agent.initial_internals()
                 current_step = 0
+                ep_pos = []
+                ep_actions = []
+                class_distrib[i] = []
                 while not terminal:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=True)
-                    if heatmap_needed:
-                        agent_positions.append(environment.environment.agent_pos)
                     distrib = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
+                    ############### GATHERING DATA ################
+                    ep_pos.append(str(environment.environment.agent_pos))
+                    ep_actions.append(int(action))
+                    # Marginalized distribution over classification actions
+                    class_distrib[i].append([x / sum(distrib[:10]) for x in distrib[:10]])
+                    ###############################################
                     environment.environment.set_agent_classification(distrib)
                     state, terminal, reward = environment.execute(actions=action)
                     if terminal:
@@ -167,18 +177,17 @@ if __name__ == '__main__':
                             pred = net(pred)
                         if int(action) < 10:
                             # Add a classification attempt
-                            predicted_labels.append(int(action))
-                            true_labels.append(int(test_labels[i-1]))
-                            baseline_labels.append(int(np.argmax(pred)))
-                            # Marginalized distribution over classification actions
-                            class_distrib.append([x / sum(distrib[:10]) for x in distrib[:10]])
-                            class_pos.append(str(environment.environment.agent_pos))
+                            predicted_labels[i] = int(action)
                         else:
                             #class_dis = [x / sum(distrib[:10]) for x in distrib[:10]]
                             if np.argmax(pred) == test_labels[i - 1]:
                                 base_correct += 1
                             #class_attempt += 1
                             only_baseline.append((i-1, int(np.argmax(pred))))
+                        true_labels[i] = int(test_labels[i - 1])
+                        baseline_labels[i] = int(np.argmax(pred))
+                        agent_positions[i] = ep_pos
+                        actions[i] = ep_actions
                     if int(action) < 10:
                         class_attempt += 1
                     ep_reward += reward
@@ -200,7 +209,8 @@ if __name__ == '__main__':
             performance['true lab'] = true_labels
             performance['baseline'] = baseline_labels
             performance['class distr'] = class_distrib
-            performance['class position'] = class_pos
+            performance['positions'] = agent_positions
+            performance['actions'] = actions
             with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
@@ -213,7 +223,7 @@ if __name__ == '__main__':
             agent_baseline_right = 0
             different_class = 0
             same_class = 0
-            for i in range(len(performance['predicted'])):
+            for i in predicted_labels.keys():
                 if predicted_labels[i] == true_labels[i] and baseline_labels[i] == true_labels[i]:
                     agent_baseline_right += 1
                 if predicted_labels[i] == true_labels[i] and baseline_labels[i] != true_labels[i]:
@@ -246,4 +256,4 @@ if __name__ == '__main__':
             print('    where agent and baseline predict different classes: %d / %d' % (different_class, len(test_labels)))
             print('Number of times that baseline produces correct output when agent does not classify: %d / %d' % (right, len(only_baseline)))
             if heatmap_needed:
-                build_heatmap(agent_positions, dir=directory, show=False)
+                build_heatmap(agent_positions, dir=directory, show=False, all_epochs=False)

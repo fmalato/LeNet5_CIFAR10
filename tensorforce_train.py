@@ -28,8 +28,8 @@ if __name__ == '__main__':
         lstm_horizon = 5
         lstm_units = 128
         steps_per_episode = 15    # Scale movement reward as well
-        policy_lr = 1e-4
-        baseline_lr = 1e-3
+        policy_lr = 1e-6
+        baseline_lr = 1e-4
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -44,22 +44,22 @@ if __name__ == '__main__':
         load_checkpoint = True
         same_split = True
         # Train/test parameters
-        num_epochs = 7
+        num_epochs = 2
         partial_dataset = False
-        layers = [2, 3]
+        layers = [0, 1, 2, 3]
         if partial_dataset:
-            images_per_class = 10
+            images_per_class = 5
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
             same_split = False
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
                       baseline_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
-                      non_classified, images_per_class, "{x}".format(x=layers)]
+                      non_classified, images_per_class, "{x}".format(x=layers), step_reward_multiplier]
         parameters_names = ['Batch Size', 'Sampling Ratio', 'Discount Factor', 'LSTM Units', 'LSTM horizon', 'Steps per Episode',
                             'Policy lr', 'Baseline lr', 'Entropy Reg', 'Dataset Split Ratio', 'Class Penalty',
                             'Correct Classification', 'Illegal Move', 'Same Position', 'Non Classified',
-                            'Images per Class', 'Layers']
+                            'Images per Class', 'Layers', 'Step Reward multiplier']
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:GPU:0'):
@@ -159,8 +159,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210426-131450'
-            old_epochs = 8
+            directory = 'models/RL/20210428-125328'
+            old_epochs = 28
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             """summarizer=dict(
                                                         directory='data/summaries',
@@ -180,7 +180,10 @@ if __name__ == '__main__':
                                                     ],
                                                     baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                                     # TODO: Huge file - find minimum number of parameters
-                                                    summarizer=None,
+                                                    summarizer=dict(
+                                                        directory='data/summaries',
+                                                        summaries=['action-value', 'entropy', 'reward', 'distribution']
+                                                    ),
                                                     learning_rate=policy_lr,
                                                     batch_size=batch_size,
                                                     tracking=['distribution'],
@@ -205,7 +208,11 @@ if __name__ == '__main__':
                                                       ],
                                                       baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
                                                       # TODO: Huge file - find minimum number of parameters
-                                                      summarizer=None,
+                                                      summarizer=dict(
+                                                          directory='data/summaries',
+                                                          summaries=['action-value', 'entropy', 'reward',
+                                                                     'distribution']
+                                                      ),
                                                       learning_rate=policy_lr,
                                                       batch_size=batch_size,
                                                       tracking=['distribution'],

@@ -8,7 +8,7 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pylab import cm, hsv
+from keras.losses import CategoricalCrossentropy
 
 
 # Check execution time of a line/block of lines
@@ -110,7 +110,7 @@ def illegal_actions(filename):
             illegal_actions += 1
             pos = 4
     print('Number of illegal actions: %d / %d' % (illegal_actions, len(actions)))
-    print('Probability of illegal action: %f' % (illegal_actions/len(actions)))
+    print('Probability of illegal action: %f' % (illegal_actions / len(actions)))
 
 
 def one_image_per_class(labels, num_classes):
@@ -132,7 +132,7 @@ def n_images_per_class(n, labels, num_classes, starting_index=0):
     for j in range(n):
         selected = []
         # avoid repetitions
-        i = np.max(indexes)+1 if len(indexes) > 0 else starting_index
+        i = np.max(indexes) + 1 if len(indexes) > 0 else starting_index
         while len(selected) < num_classes:
             if labels[i] not in selected:
                 selected.append([int(labels[i])])
@@ -162,7 +162,7 @@ def n_images_per_class_new(n, labels, num_classes):
 
 
 def split_dataset(dataset, labels, ratio=0.8, num_classes=10, save_idxs=False):
-    splitting_index = int(len(dataset)*ratio/num_classes)
+    splitting_index = int(len(dataset) * ratio / num_classes)
     # We need data to be balanced
     by_class = divide_by_class(labels, num_classes)
     balanced_train_idxs = []
@@ -215,17 +215,22 @@ def shuffle_data(dataset, labels, RGB_imgs, visualize=False):
     return np.array(shuffled_data), np.array(shuffled_labels), (np.array(shuffled_RGB) if visualize else None)
 
 
-def build_heatmap(positions, dir, show=True):
+def build_heatmap(positions, dir, show=True, per_class=False, class_name='', all_epochs=False, epoch=0):
     if not os.path.exists(dir + '/heatmaps/'):
         os.mkdir(dir + '/heatmaps/')
+    if all_epochs and not os.path.exists(dir + '/heatmaps/{e}/'.format(e=epoch)):
+        os.mkdir(dir + '/heatmaps/{e}/'.format(e=epoch))
     # A 16x16 image is not readable and is heavily blurred when rescaled
     env = {}
     env[0] = np.zeros((16, 16), dtype=np.int)
     env[1] = np.zeros((8, 8), dtype=np.int)
     env[2] = np.zeros((4, 4), dtype=np.int)
     env[3] = np.zeros((2, 2), dtype=np.int)
-    for el in positions:
-        env[el[0]][el[1], el[2]] += 1
+    for key in positions.keys():
+        for el in positions[key]:
+            el = re.sub('[()]', '', el)
+            res = tuple(map(int, el.split(', ')))
+            env[res[0]][res[1], res[2]] += 1
 
     for key in env.keys():
         fig, ax = plt.subplots()
@@ -248,7 +253,12 @@ def build_heatmap(positions, dir, show=True):
         if show:
             plt.show()
 
-        fig.savefig(dir + '/heatmaps/{s}.png'.format(s=key))
+        if per_class:
+            fig.savefig(dir + '/heatmaps/{s}_{cn}.png'.format(s=key, cn=class_name))
+        elif all_epochs:
+            fig.savefig(dir + '/heatmaps/{e}/{e}_{s}.png'.format(e=epoch, s=key))
+        else:
+            fig.savefig(dir + '/heatmaps/{s}.png'.format(s=key))
 
 
 def plot_mov_histogram(dir_path, filepath, num_timesteps=15, nrows=4, ncols=5):
@@ -257,7 +267,7 @@ def plot_mov_histogram(dir_path, filepath, num_timesteps=15, nrows=4, ncols=5):
         f.close()
     steps = list(range(num_timesteps))
     keys = list(hist.keys())
-    fig, axs = plt.subplots(nrows, ncols, figsize=(5*nrows, 3*ncols))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(5 * nrows, 3 * ncols))
     fig.suptitle('Movement histogram epoch by epoch')
     idx = 0
     if nrows == 1 and ncols == 1:
@@ -288,7 +298,7 @@ def analyze_distributions(dir_path, filepath):
     a_wrong_b_wrong_diff_lab = []
     almost_right_AwBr = 0
     almost_right = 0
-    for i in range(len(predicted)):
+    for i in predicted.keys():
         if predicted[i] == true_lab[i] and baseline[i] == true_lab[i]:
             both_right.append(np.max(distribs[i]))
         if predicted[i] == true_lab[i] and baseline[i] != true_lab[i]:
@@ -308,11 +318,13 @@ def analyze_distributions(dir_path, filepath):
     print('Average peak value for A right - B right: {avg}'.format(avg=sum(both_right) / len(both_right)))
     print('Average peak value for A wrong - B right: {avg}'.format(avg=sum(a_wrong_b_right) / len(a_wrong_b_right)))
     print('Average peak value for A right - B wrong: {avg}'.format(avg=sum(a_right_b_wrong) / len(a_right_b_wrong)))
-    print('Average peak value for A wrong - B wrong with same label: {avg}'.format(avg=sum(a_wrong_b_wrong_same_lab) / len(a_wrong_b_wrong_same_lab)))
-    print('Average peak value for A wrong - B wrong with different label: {avg}'.format(avg=sum(a_wrong_b_wrong_diff_lab) / len(a_wrong_b_wrong_diff_lab)))
-    print('Percentage of A wrong - B wrong with diff labels where right label is in top-3 positions: {p}%'.format(
+    print('Average peak value for A wrong - B wrong with same label: {avg}'.format(
+        avg=sum(a_wrong_b_wrong_same_lab) / len(a_wrong_b_wrong_same_lab)))
+    print('Average peak value for A wrong - B wrong with different label: {avg}'.format(
+        avg=sum(a_wrong_b_wrong_diff_lab) / len(a_wrong_b_wrong_diff_lab)))
+    print('Percentage of A wrong - B wrong with diff labels where correct label is in top-3 positions: {p}%'.format(
         p=round(almost_right / len(a_wrong_b_wrong_diff_lab), 2) * 100))
-    print('Percentage of A wrong - B right where right label is in top-3 positions: {p}%'.format(
+    print('Percentage of A wrong - B right where correct label is in top-3 positions: {p}%'.format(
         p=round(almost_right_AwBr / len(a_wrong_b_right), 2) * 100))
 
 
@@ -324,11 +336,11 @@ def error_corr_matrix(dir_path, filepath):
         f.close()
     predicted = data['predicted']
     true_lab = data['true lab']
-    num_classes = len(data['class distr'][0])
+    num_classes = len(class_names)
     corr_matrix = np.zeros((num_classes, num_classes), dtype=np.int)
-    for pred, true in zip(predicted, true_lab):
-        if pred != true:
-            corr_matrix[pred, true] += 1
+    for key in predicted.keys():
+        if predicted[key] != true_lab[key]:
+            corr_matrix[predicted[key], true_lab[key]] += 1
 
     fig, ax = plt.subplots()
     im = ax.imshow(corr_matrix)
@@ -348,57 +360,176 @@ def error_corr_matrix(dir_path, filepath):
                            ha="center", va="center", color="black")
 
     ax.set_title("Error correlation matrix")
+    ax.set_xlabel("True Label")
+    ax.set_ylabel("Predicted Label")
     fig.tight_layout()
     plt.show()
     fig.savefig(dir_path + "error_corr_matrix.png")
 
 
-def classification_position(dir_path, filepath, ):
+def classification_position(dir_path, filepath):
     with open(dir_path + filepath, 'r') as f:
         data = json.load(f)
         f.close()
     predicted = data['predicted']
     true_lab = data['true lab']
-    positions = data['class position']
-    num_pred = len(predicted)
+    positions = data['positions']
     pred_in_pos = {}
-    for i in range(num_pred):
-        if positions[i] not in pred_in_pos:
-            pred_in_pos[positions[i]] = [0, 0]
-        if predicted[i] == true_lab[i]:
-            pred_in_pos[positions[i]][0] += 1
-        pred_in_pos[positions[i]][1] += 1
-
-    """xs = []
-    ys = []
-    zs = []
-    colors = []
-    for key in pred_in_pos.keys():
-        k = re.sub('[()]', '', key)
-        res = tuple(map(int, k.split(', ')))
-        xs.append(res[0])
-        ys.append(res[1])
-        zs.append(res[2])
-        colors.append(pred_in_pos[key][1])
-
-    fig = plt.figure(figsize=(8, 6))
-
-    ax = fig.add_subplot(111, projection='3d')
-    colmap = cm.ScalarMappable(cmap='hot')
-    colmap.set_array(np.array(colors))
-
-    yg = ax.scatter(xs, ys, zs, c=np.array(colors) / max(np.array(colors)), marker='s')
-    cb = fig.colorbar(colmap)
-
-    ax.set_xlabel('Layer')
-    ax.set_ylabel('Column')
-    ax.set_zlabel('Row')
-
-    plt.show()"""
+    for key in predicted.keys():
+        steps = len(positions[key]) - 1
+        if positions[key][steps] not in pred_in_pos:
+            pred_in_pos[positions[key][steps]] = [0, 0]
+        if predicted[key] == true_lab[key]:
+            pred_in_pos[positions[key][steps]][0] += 1
+        pred_in_pos[positions[key][steps]][1] += 1
 
     print(pred_in_pos)
 
-#plot_mov_histogram(dir_path='models/RL/20210421-130304/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
-#analyze_distributions('models/RL/20210421-130304/stats/', 'predicted_labels.json')
-#error_corr_matrix('models/RL/20210421-130304/stats/', 'predicted_labels.json')
-#classification_position('models/RL/20210421-130304/stats/', 'predicted_labels.json')
+
+def heatmap_per_class(dir_path, filepath, num_classes=10):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                   'dog', 'frog', 'horse', 'ship', 'truck']
+    true_lab = data['true lab']
+    positions = data['positions']
+    predicted = data['predicted']
+    movement = {}
+    for i in range(num_classes):
+        movement[i] = {}
+        for key in true_lab.keys():
+            if true_lab[key] == i:
+                movement[i][key] = positions[key]
+    for key in movement.keys():
+        build_heatmap(movement[key], dir=dir_path, show=False, per_class=True, class_name=class_names[key])
+
+
+def heatmap_before_classification(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    positions = data['positions']
+    class_name = 'LAST'
+    movement = {}
+    for key in positions.keys():
+        movement[key] = []
+        i = 0
+        for el in positions[key]:
+            if i == len(positions[key]) - 1:
+                movement[key].append(el)
+                i = 0
+            else:
+                i += 1
+    build_heatmap(movement, dir_path, show=False, per_class=True, class_name=class_name)
+
+
+def distributions_over_time(dir_path, filepath, plot=False):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    distributions = data['class distr']
+    true_lab = data['true lab']
+    predicted = data['predicted']
+    cat_cross = CategoricalCrossentropy()
+    entropies = {}
+    if not plot:
+        keys = list(distributions.keys())[:30]
+    else:
+        # Cherry-picked examples for plotting
+        keys = ['1', '22', '24', '28']
+    for key in keys:
+        if key not in entropies.keys():
+            entropies[key] = []
+        for el in distributions[key]:
+            margin = [x / sum(el[:10]) for x in el[:10]]
+            one_hot_label = [1.0 if x == true_lab[key] else 0.0 for x in range(len(margin))]
+            entropies[key].append(cat_cross(margin, one_hot_label).numpy())
+        print(
+            'Number of steps: {sn} - Starting entropy: {se} - Ending entropy: {ee} - Predicted: {p} - Ground truth: {gt}'.format(
+                sn=len(entropies[key]),
+                se=entropies[key][0],
+                ee=entropies[key][len(entropies[key]) - 1],
+                p=predicted[key] if key in predicted.keys() else 'Non predicted',
+                gt=true_lab[key]))
+    if plot:
+        fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(8, 10))
+        axs[0, 0].plot(range(len(entropies[keys[0]])), entropies[keys[0]])
+        axs[0, 0].set_title('Right classification')
+        axs[0, 0].set_xlabel('Timesteps')
+        axs[0, 0].set_ylabel('Entropy')
+        axs[0, 1].plot(range(len(entropies[keys[1]])), entropies[keys[1]])
+        axs[0, 1].set_title('Non classified episode')
+        axs[0, 1].set_xlabel('Timesteps')
+        axs[0, 1].set_ylabel('Entropy')
+        axs[1, 0].plot(range(len(entropies[keys[2]])), entropies[keys[2]])
+        axs[1, 0].set_title('Missed opportunity')
+        axs[1, 0].set_xlabel('Timesteps')
+        axs[1, 0].set_ylabel('Entropy')
+        axs[1, 1].plot(range(len(entropies[keys[3]])), entropies[keys[3]])
+        axs[1, 1].set_title('Wrong classification')
+        axs[1, 1].set_xlabel('Timesteps')
+        axs[1, 1].set_ylabel('Entropy')
+        plt.show()
+        fig.savefig(dir_path + 'entropies.png')
+
+
+def generate_graph(data, title='', xlabel='', ylabel='', show=False, save=True, save_name='fig', legend=''):
+    x_axis = range(len(data[0]))
+    figure, ax = plt.subplots(1, 1, figsize=(8, 6))
+    if len(data) > 1:
+        for el, label in zip(data, legend):
+            ax.plot(x_axis, el, label=label)
+        plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=9,
+                   ncol=2, mode="expand", borderaxespad=0.)
+    else:
+        for el in data:
+            ax.plot(x_axis, el)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if show:
+        plt.show()
+    if save:
+        figure.savefig('figures/' + save_name + '.png')
+
+
+# plot_mov_histogram(dir_path='models/RL/20210428-125328/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
+#analyze_distributions('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+#error_corr_matrix('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+# classification_position('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+# heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+# heatmap_before_classification('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+# distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=True)
+"""generate_graph([],
+               title='Comparison between training and validation average rewards',
+               xlabel='Epochs',
+               ylabel='Avg Reward',
+               show=False,
+               save=True,
+               save_name='train_val_rew',
+               legend=['Training Avg Reward', 'Validation Avg Reward'])"""
+
+# Training acc
+"""[32.21, 55.33, 62.37, 65.11, 66.6, 67.91, 68.64, 69.11, 69.95, 70.08, 70.28, 70.77, 70.94, 70.84, 71.17,
+                 72.0, 73.1, 73.12, 73.56, 73.34, 73.73, 73.81, 73.5, 73.75, 73.52, 73.72, 73.89, 73.63, 73.64, 73.39]"""
+# Valid RCA acc
+"""[45.68, 44.44, 62.98, 59.21, 64.44, 59.01, 57.86, 59.8, 66.5, 66.87, 64.85, 66.38, 64.12, 65.25, 66.04,
+                 67.78, 67.36, 66.88, 67.15, 67.69, 67.23, 67.92, 67.27, 68.05, 67.36, 67.7, 67.94, 67.42, 67.36, 67.33],
+                [56.63, 68.93, 67.98, 67.01, 68.14, 68.67, 69.65, 66.75, 68.52, 68.54, 67.01, 66.94, 66.86, 68.3, 69.38,
+                 69.78, 69.41, 69.26, 69.56, 69.18, 69.47, 69.12, 69.34, 69.54, 69.59, 69.43, 69.27, 69.36, 69.41, 69.48]"""
+# Classification
+"""[0.8066 * 100, 0.6447 * 100, 0.9264 * 100, 0.8836 * 100, 0.9457 * 100, 0.8593 * 100, 0.8307 * 100,
+                 0.8959 * 100, 0.9705 * 100, 0.9756 * 100, 0.9678 * 100, 0.9916 * 100, 0.959 * 100, 0.9553 * 100,
+                 0.9519 * 100, 0.9714 * 100, 0.9705 * 100, 0.9656 * 100, 0.9653 * 100, 0.9784 * 100, 0.9677 * 100,
+                 0.9826 * 100, 0.9701 * 100, 0.9786 * 100, 0.968 * 100, 0.9751 * 100, 0.9808 * 100, 0.972 * 100,
+                 0.9705 * 100, 0.9691 * 100]"""
+# Movement
+"""[5.3199, 7.776, 4.9, 5.759, 5.4486, 6.9698, 8.6732, 7.8924, 6.4587, 6.6214, 7.2806, 5.2721, 7.1392,
+                 6.5761, 7.518, 7.1594, 7.6638, 7.873, 7.9247, 7.5301, 8.3381, 7.6874, 8.4006, 8.3559, 9.0197, 8.6715,
+                 8.6415, 8.9895, 9.0945, 9.0845]"""
+# Rewards
+"""[-0.084, 0.654, 0.926, 1.039, 1.109, 1.163, 1.204, 1.217, 1.251, 1.257, 1.274, 1.301, 1.293, 1.29, 1.299,
+                 1.331, 1.374, 1.379, 1.389, 1.395, 1.416, 1.416, 1.512, 1.575, 1.605, 1.611, 1.617, 1.629, 1.635, 1.633],
+                [-0.726, -0.374, 1.114, 0.981, 1.222, 1.037, 1.104, 1.228, 1.419, 1.444, 1.441, 1.361, 1.39, 1.374, 1.482,
+                 1.542, 1.583, 1.576, 1.583, 1.582, 1.633, 1.626, 1.641, 1.676, 1.715, 1.708, 1.724, 1.723, 1.727, 1.729]"""
