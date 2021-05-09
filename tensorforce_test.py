@@ -81,7 +81,8 @@ if __name__ == '__main__':
                                           labels=test_labels,
                                           images=RGB_images,
                                           layers=layers,
-                                          max_steps=steps_per_episode,
+                                          # TODO: this doesn't work
+                                          max_steps=None,
                                           visualize=visualize,
                                           training=False,
                                           class_penalty=class_penalty,
@@ -168,6 +169,9 @@ if __name__ == '__main__':
                     ###############################################
                     environment.environment.set_agent_classification(distrib)
                     state, terminal, reward = environment.execute(actions=action)
+                    # TODO: terminal inhibition doesn't work
+                    if int(action) >= 10:
+                        terminal = False
                     if terminal:
                         mov_histogram[0][current_step] += 1
                         if action == test_labels[i - 1]:

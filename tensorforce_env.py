@@ -108,7 +108,7 @@ class DyadicConvnetGymEnv(gym.Env):
                 self.agent_pos = (self.agent_pos[0] - 1,
                                   2*self.agent_pos[1] + 1,
                                   2*self.agent_pos[2] + 1)
-        # If agent classifies well, end the episode
+        # If agent classifies, end the episode
         else:
             self.class_reward = self.correct_class if action == self.image_class else -self.class_penalty
             done = True
@@ -124,8 +124,8 @@ class DyadicConvnetGymEnv(gym.Env):
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
                                predicted=action if int(action) < 10 else None, first_step=False)
 
-        if self.step_count >= self.max_steps:
-            if self.training:
+        if self.training:
+            if self.step_count >= self.max_steps:
                 done = True
 
         # Punishing the agent for illegal actions

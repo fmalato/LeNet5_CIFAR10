@@ -8,6 +8,8 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
+from mpl_toolkits.axes_grid1 import ImageGrid
+
 from keras.losses import CategoricalCrossentropy
 
 
@@ -425,6 +427,8 @@ def heatmap_before_classification(dir_path, filepath):
 
 
 def distributions_over_time(dir_path, filepath, plot=False):
+    class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                   'dog', 'frog', 'horse', 'ship', 'truck']
     with open(dir_path + filepath, 'r') as f:
         data = json.load(f)
         f.close()
@@ -433,8 +437,14 @@ def distributions_over_time(dir_path, filepath, plot=False):
     predicted = data['predicted']
     cat_cross = CategoricalCrossentropy()
     entropies = {}
+    # Non classified - Lost chance test
+    """diff = []
+    diff_not = []"""
+    # Class occurrencies test
+    labels = np.zeros((10,))
+    labels_f = np.zeros((10,))
     if not plot:
-        keys = list(distributions.keys())[:30]
+        keys = list(distributions.keys())
     else:
         # Cherry-picked examples for plotting
         keys = ['1', '22', '24', '28']
@@ -445,13 +455,36 @@ def distributions_over_time(dir_path, filepath, plot=False):
             margin = [x / sum(el[:10]) for x in el[:10]]
             one_hot_label = [1.0 if x == true_lab[key] else 0.0 for x in range(len(margin))]
             entropies[key].append(cat_cross(margin, one_hot_label).numpy())
-        print(
+        """print(
             'Number of steps: {sn} - Starting entropy: {se} - Ending entropy: {ee} - Predicted: {p} - Ground truth: {gt}'.format(
                 sn=len(entropies[key]),
                 se=entropies[key][0],
                 ee=entropies[key][len(entropies[key]) - 1],
                 p=predicted[key] if key in predicted.keys() else 'Non predicted',
-                gt=true_lab[key]))
+                gt=true_lab[key]))"""
+        # Non classified - Lost chance test
+        """if key in predicted.keys():
+            diff.append(abs(entropies[key][len(entropies[key]) - 1] - entropies[key][len(entropies[key]) - 2]))
+        else:
+            diff_not.append(abs(entropies[key][len(entropies[key]) - 1] - entropies[key][len(entropies[key]) - 2]))
+    print(np.average(diff), np.average(diff_not))"""
+        # Class occurrencies test
+        if key not in predicted.keys() and entropies[key][len(entropies[key]) - 1] < 3:
+            labels[true_lab[key]] += 1
+        if key not in predicted.keys() and entropies[key][len(entropies[key]) - 1] > 3:
+            labels_f[true_lab[key]] += 1
+    fig, ax = plt.subplots(1, 1, figsize=(7, 7))
+    ax.set_ylabel('Occurrences')
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+    ax.plot(class_names, list(labels), label='Correct non classified')
+    ax.plot(class_names, list(labels_f), label='Wrong not classified')
+    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=9,
+               ncol=2, mode="expand", borderaxespad=0.)
+    fig.savefig(dir_path + 'non_class_occurrencies.png')
+    plt.show()
+    print(labels, labels_f)
+
     if plot:
         fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(8, 10))
         axs[0, 0].plot(range(len(entropies[keys[0]])), entropies[keys[0]])
@@ -494,13 +527,50 @@ def generate_graph(data, title='', xlabel='', ylabel='', show=False, save=True, 
         figure.savefig('figures/' + save_name + '.png')
 
 
+def each_position(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    actions = {}
+    for key in data.keys():
+        if key != "ground truth":
+            if data[key]["prediction"] not in actions.keys():
+                actions[int(data[key]["prediction"])] = 0
+            if 0 < int(data[key]["prediction"]) < 10:
+                actions[int(data[key]["prediction"])] += 1
+            else:
+                actions[-1] += 1
+    print(actions)
+
+
+def image_grid(nrows, ncols, images_dir, name):
+    image_paths = sorted(os.listdir(images_dir))
+    imgs = []
+    for img in image_paths:
+        imgs.append(plt.imread(images_dir + img))
+    fig = plt.figure(figsize=(2 * ncols, 2 * nrows))
+    grid = ImageGrid(fig, 111,
+                     nrows_ncols=(nrows, ncols),
+                     axes_pad=0.1, share_all=True
+                     )
+    grid[0].get_yaxis().set_ticks([])
+    grid[0].get_xaxis().set_ticks([])
+
+    for ax, im in zip(grid, imgs):
+        # Iterating over the grid returns the Axes.
+        ax.imshow(im)
+    plt.savefig(images_dir + "{name}.png".format(name=name), bbox_inches='tight')
+    plt.show()
+
 # plot_mov_histogram(dir_path='models/RL/20210428-125328/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
 #analyze_distributions('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 #error_corr_matrix('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 # classification_position('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 # heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 # heatmap_before_classification('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-# distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=True)
+#distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=False)
+#each_position('models/RL/20210428-125328/stats/', 'each_position.json')
+#image_grid(2, 5, 'correlated_errors/automobile-truck/', 'automobile-truck')
 """generate_graph([],
                title='Comparison between training and validation average rewards',
                xlabel='Epochs',
@@ -530,6 +600,6 @@ def generate_graph(data, title='', xlabel='', ylabel='', show=False, save=True, 
                  8.6415, 8.9895, 9.0945, 9.0845]"""
 # Rewards
 """[-0.084, 0.654, 0.926, 1.039, 1.109, 1.163, 1.204, 1.217, 1.251, 1.257, 1.274, 1.301, 1.293, 1.29, 1.299,
-                 1.331, 1.374, 1.379, 1.389, 1.395, 1.416, 1.416, 1.512, 1.575, 1.605, 1.611, 1.617, 1.629, 1.635, 1.633],
+                 1.331, 1.374, 1.379, 1.389, 1.395, 1.416, 1.416, 1.418, 1.431, 1.432, 1.439, 1.455, 1.448, 1.43, 1.44],
                 [-0.726, -0.374, 1.114, 0.981, 1.222, 1.037, 1.104, 1.228, 1.419, 1.444, 1.441, 1.361, 1.39, 1.374, 1.482,
-                 1.542, 1.583, 1.576, 1.583, 1.582, 1.633, 1.626, 1.641, 1.676, 1.715, 1.708, 1.724, 1.723, 1.727, 1.729]"""
+                 1.542, 1.583, 1.576, 1.583, 1.582, 1.633, 1.626, 1.625, 1.642, 1.618, 1.649, 1.662, 1.669, 1.673, 1.665]"""
