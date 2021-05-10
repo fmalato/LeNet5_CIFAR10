@@ -4,7 +4,7 @@ import json
 
 import numpy as np
 import tensorflow as tf
-from tensorforce.agents import Agent
+from tensorforce.agents import ProximalPolicyOptimization
 from tensorforce.environments import Environment
 from tensorflow.keras import datasets
 
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 1e-6
+        policy_lr = 5e-6
         baseline_lr = 1e-4
         e_r = 0.1
         split_ratio = 0.8
@@ -46,8 +46,8 @@ if __name__ == '__main__':
             images_per_class = 1
         else:
             images_per_class = 1000
-        heatmap_needed = True
-        histogram_needed = True
+        heatmap_needed = False
+        histogram_needed = False
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -98,34 +98,36 @@ if __name__ == '__main__':
                                              features=dict(type=float, shape=(147,)),
                                          ),
                                          actions=dict(type=int, num_values=num_actions+num_classes),
-                                         max_episode_timesteps=steps_per_episode
+                                         max_episode_timesteps=None
                                          )
         dirs = ['models/RL/20210428-125328']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
             old_epochs = 27
-            agent = Agent.load(directory=check_dir,
-                               filename='agent-{oe}'.format(oe=old_epochs-1),
-                               format='hdf5',
-                               environment=environment,
-                               agent='ppo',
-                               network=[
-                                       dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
-                               ],
-                               baseline=[
-                                   dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
-                               ],
-                               baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
-                               learning_rate=policy_lr,
-                               batch_size=batch_size,
-                               tracking=['distribution'],
-                               discount=discount,
-                               states=dict(
-                                   features=dict(type=float, shape=(147,)),
-                               ),
-                               actions=dict(type=int, num_values=num_actions+num_classes)
-                               )
+            agent = ProximalPolicyOptimization.load(directory=check_dir,
+                                                    filename='agent-{oe}'.format(oe=old_epochs-1),
+                                                    format='hdf5',
+                                                    environment=environment,
+                                                    agent='ppo',
+                                                    network=[
+                                                        dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu'),
+                                                    ],
+                                                    baseline=[
+                                                        dict(type='lstm', size=lstm_units, horizon=lstm_horizon, activation='relu')
+                                                    ],
+                                                    baseline_optimizer=dict(optimizer='adam', learning_rate=baseline_lr),
+                                                    learning_rate=policy_lr,
+                                                    batch_size=batch_size,
+                                                    tracking=['distribution'],
+                                                    discount=discount,
+                                                    states=dict(
+                                                        features=dict(type=float, shape=(147,)),
+                                                    ),
+                                                    actions=dict(type=int, num_values=num_actions+num_classes),
+                                                    max_episode_timesteps=None,
+                                                    memory=100000
+                                                    )
             # Parameters for test loop
             episode = 0
             correct = 0
@@ -157,7 +159,7 @@ if __name__ == '__main__':
                 ep_pos = []
                 ep_actions = []
                 class_distrib[i] = []
-                while not terminal:
+                while current_step < 75:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=True)
                     distrib = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
@@ -215,12 +217,12 @@ if __name__ == '__main__':
             performance['class distr'] = class_distrib
             performance['positions'] = agent_positions
             performance['actions'] = actions
-            with open(directory + '/stats/predicted_labels.json', 'w+') as f:
+            """with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
             if histogram_needed:
                 with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
-                    json.dump(mov_histogram, f)
+                    json.dump(mov_histogram, f)"""
             right_when_baseline_wrong = 0
             wrong_when_baseline_right = 0
             agent_baseline_wrong = 0

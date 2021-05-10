@@ -571,6 +571,16 @@ def image_grid(nrows, ncols, images_dir, name):
 #distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=False)
 #each_position('models/RL/20210428-125328/stats/', 'each_position.json')
 #image_grid(2, 5, 'correlated_errors/automobile-truck/', 'automobile-truck')
+with open('models/RL/20210428-125328/stats/each_position.json', 'r') as f:
+    data = json.load(f)
+    f.close()
+positions = {}
+i = 0
+for key in data.keys():
+    if key != 'ground truth':
+        positions[i] = data[key]['class pos']
+        i += 1
+build_heatmap(positions, 'heatmaps/')
 """generate_graph([],
                title='Comparison between training and validation average rewards',
                xlabel='Epochs',

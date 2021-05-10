@@ -13,7 +13,7 @@ from tensorforce_env import DyadicConvnetGymEnv
 
 if __name__ == "__main__":
     layers = [0, 1, 2, 3]
-    image_index = 21
+    image_index = 27
     # Network hyperparameters
     batch_size = 50
     sampling_ratio = 0.99
@@ -134,6 +134,7 @@ if __name__ == "__main__":
                             data[current_key]["number of steps"] = steps
                             data[current_key]["prediction"] = int(action) if int(action) < 10 else -1
                             data[current_key]["distribution"] = ep_distribution
+                            data[current_key]["class pos"] = str(environment.environment.agent_pos)
         with open(directory + '/stats/each_position.json', 'w+') as f:
             json.dump(data, f)
             f.close()
