@@ -7,10 +7,12 @@ import re
 
 import numpy as np
 import matplotlib.pyplot as plt
+import visualkeras
 
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from keras.losses import CategoricalCrossentropy
+from tensorforce_net import DyadicConvNet
 
 
 # Check execution time of a line/block of lines
@@ -571,7 +573,7 @@ def image_grid(nrows, ncols, images_dir, name):
 #distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=False)
 #each_position('models/RL/20210428-125328/stats/', 'each_position.json')
 #image_grid(2, 5, 'correlated_errors/automobile-truck/', 'automobile-truck')
-with open('models/RL/20210428-125328/stats/each_position.json', 'r') as f:
+"""#with open('models/RL/20210428-125328/stats/each_position.json', 'r') as f:
     data = json.load(f)
     f.close()
 positions = {}
@@ -580,7 +582,7 @@ for key in data.keys():
     if key != 'ground truth':
         positions[i] = data[key]['class pos']
         i += 1
-build_heatmap(positions, 'heatmaps/')
+build_heatmap(positions, 'heatmaps/')    #TODO: adapt this to new data type"""
 """generate_graph([],
                title='Comparison between training and validation average rewards',
                xlabel='Epochs',
