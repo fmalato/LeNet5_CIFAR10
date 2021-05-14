@@ -4,15 +4,16 @@ import random
 import ast
 import os
 import re
+import string
 
 import numpy as np
 import matplotlib.pyplot as plt
-import visualkeras
+import graphviz as gv
 
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from keras.losses import CategoricalCrossentropy
-from tensorforce_net import DyadicConvNet
+from tensorflow.keras import datasets
 
 
 # Check execution time of a line/block of lines
@@ -549,7 +550,8 @@ def image_grid(nrows, ncols, images_dir, name):
     image_paths = sorted(os.listdir(images_dir))
     imgs = []
     for img in image_paths:
-        imgs.append(plt.imread(images_dir + img))
+        if os.path.isfile(img):
+            imgs.append(plt.imread(images_dir + img))
     fig = plt.figure(figsize=(2 * ncols, 2 * nrows))
     grid = ImageGrid(fig, 111,
                      nrows_ncols=(nrows, ncols),
@@ -564,15 +566,41 @@ def image_grid(nrows, ncols, images_dir, name):
     plt.savefig(images_dir + "{name}.png".format(name=name), bbox_inches='tight')
     plt.show()
 
+
+def pattern_corr(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    actions = {}
+    for key in data.keys():
+        actions[key] = []
+        for k in data[key].keys():
+            if k != 'ground truth':
+                actions[key].append(data[key][k]["actions"][:len(data[key][k]["actions"]) - 1])
+
+    #TODO: work on visualization with graphviz
+
+
+def num_different_patterns(dir_path, filepath):
+    with open(dir_path + filepath, 'r') as f:
+        data = json.load(f)
+        f.close()
+    actions = []
+    for key in data.keys():
+        for k in data[key].keys():
+            if k != 'ground truth':
+                actions.append(str(data[key][k]["actions"][:len(data[key][k]["actions"]) - 1]))
+    print(len(list(dict.fromkeys(actions))))
+
 # plot_mov_histogram(dir_path='models/RL/20210428-125328/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
 #analyze_distributions('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 #error_corr_matrix('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 # classification_position('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 # heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-# heatmap_before_classification('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+#heatmap_before_classification('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 #distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=False)
 #each_position('models/RL/20210428-125328/stats/', 'each_position.json')
-#image_grid(2, 5, 'correlated_errors/automobile-truck/', 'automobile-truck')
+#image_grid(2, 2, 'models/RL/20210428-125328/heatmaps/', 'heatmap_grid')
 """#with open('models/RL/20210428-125328/stats/each_position.json', 'r') as f:
     data = json.load(f)
     f.close()
@@ -615,3 +643,22 @@ build_heatmap(positions, 'heatmaps/')    #TODO: adapt this to new data type"""
                  1.331, 1.374, 1.379, 1.389, 1.395, 1.416, 1.416, 1.418, 1.431, 1.432, 1.439, 1.455, 1.448, 1.43, 1.44],
                 [-0.726, -0.374, 1.114, 0.981, 1.222, 1.037, 1.104, 1.228, 1.419, 1.444, 1.441, 1.361, 1.39, 1.374, 1.482,
                  1.542, 1.583, 1.576, 1.583, 1.582, 1.633, 1.626, 1.625, 1.642, 1.618, 1.649, 1.662, 1.669, 1.673, 1.665]"""
+
+# Splitting CIFAR-100
+"""(train_images, train_labels), (_, _) = datasets.cifar100.load_data()
+by_class = divide_by_class(train_labels, num_classes=100)
+split_ratio = 0.8
+train_idx = []
+valid_idx = []
+split_data = {}
+for el in by_class:
+    idx_split = int(len(el) * split_ratio)
+    train_idx.append(el[:idx_split])
+    valid_idx.append(el[idx_split:])
+split_data['train'] = np.concatenate(train_idx).tolist()
+split_data['valid'] = np.concatenate(valid_idx).tolist()
+with open('training_idxs_cifar100.json', 'w+') as f:
+    json.dump(split_data, f)
+    f.close()"""
+
+#num_different_patterns('models/RL/20210428-125328/stats/', 'each_position.json')

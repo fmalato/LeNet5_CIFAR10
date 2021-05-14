@@ -24,7 +24,7 @@ if __name__ == '__main__':
         num_classes = 10
         lstm_units = 128
         lstm_horizon = 5
-        steps_per_episode = 75
+        steps_per_episode = 15
         policy_lr = 5e-6
         baseline_lr = 1e-4
         e_r = 0.1
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         # Network initialization
         with tf.device('/device:CPU:0'):
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
-            net.load_weights('models/model_CIFAR10/20201212-125436.h5')
+            net.load_weights('models/model_CIFAR10/20210421-123951.h5')
             # Dataset initialization
             (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
             test_images = np.array(test_images, dtype=np.float32)
@@ -81,8 +81,7 @@ if __name__ == '__main__':
                                           labels=test_labels,
                                           images=RGB_images,
                                           layers=layers,
-                                          # TODO: this doesn't work
-                                          max_steps=15,
+                                          max_steps=steps_per_episode,
                                           visualize=visualize,
                                           training=False,
                                           class_penalty=class_penalty,
@@ -147,7 +146,7 @@ if __name__ == '__main__':
             class_pos = []
             num_images = len(test_labels)
             mov_histogram = {}
-            mov_histogram[0] = np.zeros(steps_per_episode).tolist()
+            mov_histogram[0] = np.zeros(100).tolist()
             # Test loop
             for i in range(1, len(test_labels) + 1):
                 terminal = False
@@ -158,7 +157,7 @@ if __name__ == '__main__':
                 ep_pos = []
                 ep_actions = []
                 class_distrib[i] = []
-                while current_step < steps_per_episode:
+                while not terminal:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=True)
                     distrib = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
@@ -170,9 +169,10 @@ if __name__ == '__main__':
                     ###############################################
                     environment.set_agent_classification(distrib)
                     state, terminal, reward = environment.execute(actions=action)
-                    # TODO: terminal inhibition doesn't work
                     if int(action) >= 10:
                         terminal = False
+                        if current_step >= 99:
+                            terminal = True
                     if terminal:
                         mov_histogram[0][current_step] += 1
                         if action == test_labels[i - 1]:
@@ -180,20 +180,12 @@ if __name__ == '__main__':
                         with tf.device('/device:CPU:0'):
                             pred = np.reshape(RGB_images[i-1], (1, 32, 32, 3))
                             pred = net(pred)
-                        if int(action) < 10:
-                            # Add a classification attempt
-                            predicted_labels[i] = int(action)
-                        else:
-                            #class_dis = [x / sum(distrib[:10]) for x in distrib[:10]]
-                            if np.argmax(pred) == test_labels[i - 1]:
-                                base_correct += 1
-                            #class_attempt += 1
-                            only_baseline.append((i-1, int(np.argmax(pred))))
+                        # Add a classification attempt
+                        predicted_labels[i] = int(action)
                         true_labels[i] = int(test_labels[i - 1])
                         baseline_labels[i] = int(np.argmax(pred))
                         agent_positions[i] = ep_pos
                         actions[i] = ep_actions
-                    if int(action) < 10:
                         class_attempt += 1
                     ep_reward += reward
                     current_step += 1
@@ -201,13 +193,14 @@ if __name__ == '__main__':
                 avg_reward = np.sum(rewards) / len(rewards)
                 if class_attempt == 0:
                     class_attempt = 1
-                sys.stdout.write('\rTest: Episode {ep} - Last ep. reward: {last_ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}% - w/Baseline: {bok}%'
+                sys.stdout.write('\rTest: Episode {ep} - Last ep. reward: {last_ep} - Average reward: {cr} - Correct: {ok}% - RCA Correct: {rcaok}% - w/Baseline: {bok}% - Steps: {steps}'
                                  .format(ep=i,
                                          last_ep=round(ep_reward, 2),
                                          cr=round(avg_reward, 3),
                                          ok=round((correct / i) * 100, 2),
                                          rcaok=round((correct / class_attempt) * 100, 2),
-                                         bok=round(((correct+base_correct) / i) * 100, 2)))
+                                         bok=round(((correct+base_correct) / i) * 100, 2),
+                                         steps=current_step))
                 sys.stdout.flush()
             print('\n')
             performance['predicted'] = predicted_labels
@@ -216,12 +209,12 @@ if __name__ == '__main__':
             performance['class distr'] = class_distrib
             performance['positions'] = agent_positions
             performance['actions'] = actions
-            """with open(directory + '/stats/predicted_labels.json', 'w+') as f:
+            with open(directory + '/stats/predicted_labels_no_time_limit.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
             if histogram_needed:
-                with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
-                    json.dump(mov_histogram, f)"""
+                with open(directory + '/stats/movement_histogram_test_no_time_limit.json', 'w+') as f:
+                    json.dump(mov_histogram, f)
             right_when_baseline_wrong = 0
             wrong_when_baseline_right = 0
             agent_baseline_wrong = 0

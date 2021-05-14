@@ -7,10 +7,12 @@ from tensorflow.keras.losses import CategoricalCrossentropy
 from grid_drawer import AgentSprite, Drawer
 
 
+
+
 class DyadicConvnetGymEnv(gym.Env):
 
     metadata = {'render-modes': ['human']}
-
+    #TODO: change here as you change the number of classes
     class Actions(IntEnum):
         down = 10
         up_top_left = 11
@@ -18,8 +20,15 @@ class DyadicConvnetGymEnv(gym.Env):
         up_top_right = 13
         up_bottom_right = 14
 
-    def __init__(self, dataset, images, labels, layers, max_steps, visualize=False, training=False, num_classes=10, tile_width=10,
-                 class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0,
+    class Actions_CIFAR100(IntEnum):
+        down = 100
+        up_top_left = 101
+        up_bottom_left = 102
+        up_top_right = 103
+        up_bottom_right = 104
+
+    def __init__(self, dataset, images, labels, layers, max_steps, visualize=False, training=False, num_classes=10, num_features=147,
+                 tile_width=10, class_penalty=0.1, correct_class=1.0, illegal_mov=0.5, same_position=0.01, non_classified=3.0,
                  step_reward_multiplier=0.01):
         super(DyadicConvnetGymEnv, self).__init__()
         self.episodes_count = 0
@@ -31,13 +40,17 @@ class DyadicConvnetGymEnv(gym.Env):
         self.num_layers = len(self.layers)
         self.max_layer = np.max(self.layers)
         self.min_layer = np.min(self.layers)
+        self.num_classes = num_classes
         # Extracting current training image from dataset
         self.train_image = None
         self.image_class = None
         # CNN representation of the extracted image
         self.features = None
         # Will need this for computing the reward
-        self.actions = DyadicConvnetGymEnv.Actions
+        if num_classes == 10:
+            self.actions = DyadicConvnetGymEnv.Actions
+        else:
+            self.actions = DyadicConvnetGymEnv.Actions_CIFAR100
         # Single action space
         """self.action_space = spaces.Dict({'classification': spaces.Discrete(len(self.ground_truth)),
                                          'movement': spaces.Discrete(len(self.actions))
@@ -45,7 +58,7 @@ class DyadicConvnetGymEnv(gym.Env):
         self.num_actions = num_classes + len(self.actions)
         self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(147,), dtype=np.float32)
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(num_features,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None
@@ -122,7 +135,7 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.visualize:
             self.agent_sprite.move(self.agent_pos)
             self.drawer.render(agent=self.agent_sprite, img=self.train_image, label=int(self.image_class),
-                               predicted=action if int(action) < 10 else None, first_step=False)
+                               predicted=action if int(action) < self.num_classes else None, first_step=False)
 
         if self.training:
             if self.step_count >= self.max_steps:
@@ -141,7 +154,7 @@ class DyadicConvnetGymEnv(gym.Env):
             self.mov_reward -= self.same_position
 
         reward = self.class_reward + self.mov_reward + self.step_reward_multiplier*self.step_count + new_state
-        if self.step_count == self.max_steps and int(action) >= 10:
+        if self.step_count == self.max_steps and int(action) >= self.num_classes:
             reward -= self.non_classified
         # Adjusting parameters for new observation
         self.one_hot_action = [1.0 if x == action else 0.0 for x in range(self.num_actions)]
@@ -191,7 +204,7 @@ class DyadicConvnetGymEnv(gym.Env):
 
     def set_agent_classification(self, value):
         if self.agent_classification is not None:
-            self.right_old_class = np.max(self.agent_classification) if np.argmax(self.agent_classification) < 10 else 0.0
+            self.right_old_class = np.max(self.agent_classification) if np.argmax(self.agent_classification) < self.num_classes else 0.0
         else:
             self.right_old_class = 0.0
         self.agent_classification = value

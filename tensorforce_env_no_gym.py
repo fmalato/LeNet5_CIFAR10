@@ -45,7 +45,7 @@ class DyadicConvnetGymEnv():
         self.num_actions = num_classes + len(self.actions)
         self.action_space = spaces.Discrete(n=self.num_actions)
         # 64 conv features
-        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(147,), dtype=np.float32)
+        self.observation_space = spaces.Dict({'features': spaces.Box(low=0.0, high=1.0, shape=(237,), dtype=np.float32)
                                               })
         self.step_count = 0
         self.agent_pos = None

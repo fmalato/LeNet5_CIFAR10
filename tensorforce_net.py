@@ -37,3 +37,21 @@ class DyadicConvNet(models.Sequential):
                 layer_index += 1
 
         return features
+
+    def extract_dense_output(self, image, num_dense=2):
+        output = image
+        layer_index = 1
+        for layer in self.layers:
+            output = layer(output)
+            if 'dense' in layer.name and layer_index == num_dense:
+                return output
+            elif 'dense' in layer.name:
+                layer_index += 1
+
+
+class NewOutputLayer(models.Sequential):
+
+    def __init__(self, input_shape=(1, 32, 32, 3)):
+        super().__init__(layers=layers.Dense(100, activation='softmax'))
+        self.build(input_shape=input_shape)
+

@@ -58,6 +58,7 @@ if __name__ == '__main__':
         sampling_ratio = 0.99
         discount = 0.999
         num_classes = 10
+        num_features = 147
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
@@ -129,6 +130,8 @@ if __name__ == '__main__':
                                                   labels=test_labels,
                                                   images=RGB_images,
                                                   layers=layers,
+                                                  num_classes=10,
+                                                  num_features=num_features,
                                                   max_steps=steps_per_episode,
                                                   visualize=visualize,
                                                   training=False,
@@ -142,7 +145,7 @@ if __name__ == '__main__':
                 num_actions = len(environment.actions)
                 environment = Environment.create(environment=environment,
                                                  states=dict(
-                                                     features=dict(type=float, shape=(147,)),
+                                                     features=dict(type=float, shape=(num_features,)),
                                                  ),
                                                  actions=dict(type=int, num_values=num_actions+num_classes),
                                                  max_episode_timesteps=steps_per_episode
@@ -165,7 +168,7 @@ if __name__ == '__main__':
                                    tracking=['distribution'],
                                    discount=discount,
                                    states=dict(
-                                       features=dict(type=float, shape=(147,)),
+                                       features=dict(type=float, shape=(num_features,)),
                                    ),
                                    actions=dict(type=int, num_values=num_actions + num_classes)
                                    )
