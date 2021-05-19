@@ -29,8 +29,8 @@ if __name__ == '__main__':
         lstm_horizon = 5
         lstm_units = 128
         steps_per_episode = 15    # Scale movement reward as well
-        policy_lr = 1e-5
-        baseline_lr = 1e-4
+        policy_lr = [1e-3, 1e-4, 1e-5,5e-6, 1e-6]
+        baseline_lr = [1e-2, 1e-3, 1e-4, 1e-4, 1e-5]
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
@@ -49,9 +49,8 @@ if __name__ == '__main__':
         partial_dataset = False
         layers = [0, 1, 2, 3]
         if partial_dataset:
-            images_per_class = 5
+            images_per_class = 50
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
-            same_split = False
         else:
             images_per_class = 4000
         parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, policy_lr,
@@ -90,13 +89,19 @@ if __name__ == '__main__':
                 tmp.append(net.extract_features(img, active_layers=layers, last_layer=4))
                 idx += 1
             # Split training and validation set
-            if same_split:
+            if same_split and not partial_dataset:
                 with open('training_idxs_cifar100.json', 'r') as f:
                     idxs = json.load(f)
                     f.close()
                 train_images, valid_images, train_labels, valid_labels = split_dataset_idxs(dataset=tmp, labels=train_labels,
                                                                                             train_idxs=idxs['train'], valid_idxs=idxs['valid'])
-            else:
+            elif same_split and partial_dataset:
+                with open('training_idxs_cifar100_partial.json', 'r') as f:
+                    idxs = json.load(f)
+                    f.close()
+                train_images, valid_images, train_labels, valid_labels = split_dataset_idxs(dataset=tmp, labels=train_labels,
+                                                                                            train_idxs=idxs['train'], valid_idxs=idxs['valid'])
+            elif not same_split:
                 train_images, valid_images, train_labels, valid_labels = split_dataset(dataset=tmp, labels=train_labels,
                                                                                        ratio=split_ratio, num_classes=num_classes)
             # We don't need them anymore - Bye bye CNN!

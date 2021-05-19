@@ -655,13 +655,15 @@ split_ratio = 0.8
 train_idx = []
 valid_idx = []
 split_data = {}
+num_examples = 50
 for el in by_class:
-    idx_split = int(len(el) * split_ratio)
-    train_idx.append(el[:idx_split])
-    valid_idx.append(el[idx_split:])
+    x = el[:num_examples]
+    idx_split = int(len(x) * split_ratio)
+    train_idx.append(x[:idx_split])
+    valid_idx.append(x[idx_split:])
 split_data['train'] = np.concatenate(train_idx).tolist()
 split_data['valid'] = np.concatenate(valid_idx).tolist()
-with open('training_idxs_cifar100.json', 'w+') as f:
+with open('training_idxs_cifar100_partial.json', 'w+') as f:
     json.dump(split_data, f)
     f.close()"""
 
