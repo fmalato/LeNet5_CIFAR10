@@ -28,12 +28,12 @@ if __name__ == "__main__":
     lstm_units = 128
     lstm_horizon = 5
     steps_per_episode = 15
-    policy_lr = 1e-6
+    policy_lr = 1e-5
     baseline_lr = 1e-4
     e_r = 0.1
     split_ratio = 0.8
     # Reward parameters
-    class_penalty = 1.0
+    class_penalty = 3.0
     correct_class = 2.0
     illegal_mov = 0.25
     same_position = 0.05
@@ -56,6 +56,7 @@ if __name__ == "__main__":
             print('\nTesting image {idx}'.format(idx=image_index))
             test_image = test_images[image_index]
             test_image = test_image / 255.0
+            test_labels = [test_labels[x] for x in image_idxs]
             # Initializing everything that the env requires to work properly
             RGB_image = [copy.deepcopy(test_image)]
             tmp = []
@@ -91,11 +92,11 @@ if __name__ == "__main__":
                                              max_episode_timesteps=steps_per_episode
                                              )
             # Agent initialization
-            dirs = ['models/RL/20210428-125328']
+            dirs = ['models/RL/20210515-120754']
             for directory in dirs:
                 check_dir = directory + '/checkpoints/'
                 print('\nTesting {dir}'.format(dir=directory))
-                old_epochs = 27
+                old_epochs = 10
                 agent = Agent.load(directory=check_dir,
                                    filename='agent-{oe}'.format(oe=old_epochs - 1),
                                    format='hdf5',

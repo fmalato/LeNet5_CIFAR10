@@ -484,7 +484,7 @@ def distributions_over_time(dir_path, filepath, plot=False):
     ax.plot(class_names, list(labels_f), label='Wrong not classified')
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=9,
                ncol=2, mode="expand", borderaxespad=0.)
-    fig.savefig(dir_path + 'non_class_occurrencies.png')
+    fig.savefig(dir_path + 'non_class_occurrences.png')
     plt.show()
     print(labels, labels_f)
 
@@ -534,16 +534,19 @@ def each_position(dir_path, filepath):
     with open(dir_path + filepath, 'r') as f:
         data = json.load(f)
         f.close()
-    actions = {}
     for key in data.keys():
-        if key != "ground truth":
-            if data[key]["prediction"] not in actions.keys():
-                actions[int(data[key]["prediction"])] = 0
-            if 0 < int(data[key]["prediction"]) < 10:
-                actions[int(data[key]["prediction"])] += 1
-            else:
-                actions[-1] += 1
-    print(actions)
+        actions = {}
+        for k in data[key].keys():
+            if k != "ground truth":
+                if data[key][k]["prediction"] not in actions.keys():
+                    actions[int(data[key][k]["prediction"])] = 0
+                if 0 <= int(data[key][k]["prediction"]) < 10:
+                    actions[int(data[key][k]["prediction"])] += 1
+                else:
+                    if -1 not in actions.keys():
+                        actions[-1] = 0
+                    actions[-1] += 1
+        print(actions)
 
 
 def image_grid(nrows, ncols, images_dir, name):
@@ -593,23 +596,24 @@ def num_different_patterns(dir_path, filepath):
     print(len(list(dict.fromkeys(actions))))
 
 # plot_mov_histogram(dir_path='models/RL/20210428-125328/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
-#analyze_distributions('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-#error_corr_matrix('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-# classification_position('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-# heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-#heatmap_before_classification('models/RL/20210428-125328/stats/', 'predicted_labels.json')
-#distributions_over_time('models/RL/20210428-125328/stats/', 'predicted_labels.json', plot=False)
+#analyze_distributions('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#error_corr_matrix('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#classification_position('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
+#heatmap_before_classification('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#distributions_over_time('models/RL/20210515-120754/stats/', 'predicted_labels.json', plot=False)
 #each_position('models/RL/20210428-125328/stats/', 'each_position.json')
 #image_grid(2, 2, 'models/RL/20210428-125328/heatmaps/', 'heatmap_grid')
-"""#with open('models/RL/20210428-125328/stats/each_position.json', 'r') as f:
+"""#with open('models/RL/20210515-120754/stats/each_position.json', 'r') as f:
     data = json.load(f)
     f.close()
 positions = {}
 i = 0
-for key in data.keys():
-    if key != 'ground truth':
-        positions[i] = data[key]['class pos']
-        i += 1
+for k in data.keys():
+    for key in data[k].keys():
+        if key != 'ground truth':
+            positions[i] = data[k][key]['positions']
+            i += 1
 build_heatmap(positions, 'heatmaps/')    #TODO: adapt this to new data type"""
 """generate_graph([],
                title='Comparison between training and validation average rewards',

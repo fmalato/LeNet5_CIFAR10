@@ -25,12 +25,12 @@ if __name__ == '__main__':
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
-        policy_lr = 5e-6
+        policy_lr = 1e-5
         baseline_lr = 1e-4
-        e_r = 0.1
+        e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
-        class_penalty = 1.0
+        class_penalty = 3.0
         correct_class = 2.0
         illegal_mov = 0.25
         same_position = 0.05
@@ -43,11 +43,11 @@ if __name__ == '__main__':
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 1
+            images_per_class = 50
         else:
             images_per_class = 1000
-        heatmap_needed = False
-        histogram_needed = False
+        heatmap_needed = True
+        histogram_needed = True
         ########################### PREPROCESSING ##############################
         # Network initialization
         with tf.device('/device:CPU:0'):
@@ -82,7 +82,7 @@ if __name__ == '__main__':
                                           images=RGB_images,
                                           layers=layers,
                                           # TODO: this doesn't work
-                                          max_steps=None,
+                                          max_steps=steps_per_episode,
                                           visualize=visualize,
                                           training=False,
                                           class_penalty=class_penalty,
@@ -98,13 +98,13 @@ if __name__ == '__main__':
                                              features=dict(type=float, shape=(147,)),
                                          ),
                                          actions=dict(type=int, num_values=num_actions+num_classes),
-                                         max_episode_timesteps=None
+                                         max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210428-125328']
+        dirs = ['models/RL/20210516-110646']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
-            old_epochs = 27
+            old_epochs = 20
             agent = ProximalPolicyOptimization.load(directory=check_dir,
                                                     filename='agent-{oe}'.format(oe=old_epochs-1),
                                                     format='hdf5',
@@ -125,8 +125,7 @@ if __name__ == '__main__':
                                                         features=dict(type=float, shape=(147,)),
                                                     ),
                                                     actions=dict(type=int, num_values=num_actions+num_classes),
-                                                    max_episode_timesteps=None,
-                                                    memory=100000
+                                                    max_episode_timesteps=steps_per_episode
                                                     )
             # Parameters for test loop
             episode = 0
@@ -159,7 +158,7 @@ if __name__ == '__main__':
                 ep_pos = []
                 ep_actions = []
                 class_distrib[i] = []
-                while current_step < 75:
+                while not terminal:
                     action, internals = agent.act(states=dict(features=state['features']), internals=internals,
                                                   independent=True, deterministic=True)
                     distrib = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
@@ -167,13 +166,14 @@ if __name__ == '__main__':
                     ep_pos.append(str(environment.environment.agent_pos))
                     ep_actions.append(int(action))
                     # Marginalized distribution over classification actions
-                    class_distrib[i].append([x / sum(distrib[:10]) for x in distrib[:10]])
+                    distr = [x / sum(distrib[:10]) for x in distrib[:10]]
+                    class_distrib[i].append(distr)
                     ###############################################
-                    environment.environment.set_agent_classification(distrib)
+                    environment.environment.set_agent_classification(distr)
                     state, terminal, reward = environment.execute(actions=action)
                     # TODO: terminal inhibition doesn't work
-                    if int(action) >= 10:
-                        terminal = False
+                    """if int(action) >= 10:
+                        terminal = False"""
                     if terminal:
                         mov_histogram[0][current_step] += 1
                         if action == test_labels[i - 1]:
@@ -217,12 +217,12 @@ if __name__ == '__main__':
             performance['class distr'] = class_distrib
             performance['positions'] = agent_positions
             performance['actions'] = actions
-            """with open(directory + '/stats/predicted_labels.json', 'w+') as f:
+            with open(directory + '/stats/predicted_labels.json', 'w+') as f:
                 json.dump(performance, f)
                 f.close()
             if histogram_needed:
                 with open(directory + '/stats/movement_histogram_test.json', 'w+') as f:
-                    json.dump(mov_histogram, f)"""
+                    json.dump(mov_histogram, f)
             right_when_baseline_wrong = 0
             wrong_when_baseline_right = 0
             agent_baseline_wrong = 0
@@ -262,4 +262,4 @@ if __name__ == '__main__':
             print('    where agent and baseline predict different classes: %d / %d' % (different_class, len(test_labels)))
             print('Number of times that baseline produces correct output when agent does not classify: %d / %d' % (right, len(only_baseline)))
             if heatmap_needed:
-                build_heatmap(agent_positions, dir=directory, show=False, all_epochs=False)
+                build_heatmap(agent_positions, dir=directory, show=True, all_epochs=False)

@@ -7,8 +7,6 @@ from tensorflow.keras.losses import CategoricalCrossentropy
 from grid_drawer import AgentSprite, Drawer
 
 
-
-
 class DyadicConvnetGymEnv(gym.Env):
 
     metadata = {'render-modes': ['human']}
@@ -44,6 +42,7 @@ class DyadicConvnetGymEnv(gym.Env):
         # Extracting current training image from dataset
         self.train_image = None
         self.image_class = None
+        self.ground_truth = None
         # CNN representation of the extracted image
         self.features = None
         # Will need this for computing the reward
@@ -170,6 +169,7 @@ class DyadicConvnetGymEnv(gym.Env):
         if self.visualize:
             self.train_image = self.images[self.episodes_count]
         self.image_class = int(self.labels[self.episodes_count])
+        self.ground_truth = [1.0 if x == self.image_class else 0.0 for x in range(self.num_classes)]
         # Go to next index
         self.episodes_count = (self.episodes_count + 1) % self.dataset_length
         # Agent starting position encoded as (layer, x, y)

@@ -1,4 +1,5 @@
 import copy
+import random
 import sys
 
 import numpy as np
@@ -20,9 +21,9 @@ if __name__ == '__main__':
         num_classes = 10
         steps_per_episode = 15
         # Reward parameters
-        class_penalty = 1.0
+        class_penalty = 3.0
         correct_class = 2.0
-        illegal_mov = 0.25
+        illegal_mov = 1.0
         same_position = 0.05
         non_classified = 3.0
         step_reward_multiplier = 0.01
@@ -49,7 +50,7 @@ if __name__ == '__main__':
             # We extract EVERY single representation to avoid doing it at every episode (MEMORY INTENSIVE)
             for img in test_images:
                 image = np.reshape(img, (1, img.shape[0], img.shape[1], img.shape[2]))
-                tmp.append(net.extract_features(image))
+                tmp.append(net.extract_features(image, active_layers=layers))
                 # Distribution are computed in the exact same order as training images
                 distributions.append(np.reshape(net(image).numpy(), (10,)))
             test_images = copy.deepcopy(tmp)
@@ -95,7 +96,9 @@ if __name__ == '__main__':
             while not terminal:
                 action = int(input("(Correct class: {cc} - Step {s}) Select action: ".format(cc=test_labels[i - 1],
                                                                                              s=step_count)))
+                environment.environment.set_agent_classification([0.07 * step_count if x == test_labels[i - 1] else (1.0 - 0.07 * step_count) / 9 for x in range(10)])
                 state, terminal, reward = environment.execute(actions=action)
+                print([0.07 * step_count if x == test_labels[i - 1] else (1.0 - 0.07 * step_count) / 9 for x in range(10)])
                 step_count += 1
                 print("Step reward: {rew} - Current position: {pos}".format(rew=round(reward, 3),
                                                                             pos=environment.environment.agent_pos))

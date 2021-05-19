@@ -28,14 +28,14 @@ if __name__ == '__main__':
         lstm_horizon = 5
         lstm_units = 128
         steps_per_episode = 15    # Scale movement reward as well
-        policy_lr = 1e-6
+        policy_lr = 1e-5
         baseline_lr = 1e-4
         e_r = 0.2
         split_ratio = 0.8
         # Reward parameters
-        class_penalty = 1.0
+        class_penalty = 3.0
         correct_class = 2.0
-        illegal_mov = 0.25
+        illegal_mov = 1.0
         same_position = 0.05
         non_classified = 3.0
         step_reward_multiplier = 0.01
@@ -44,11 +44,11 @@ if __name__ == '__main__':
         load_checkpoint = True
         same_split = True
         # Train/test parameters
-        num_epochs = 2
+        num_epochs = 10
         partial_dataset = False
         layers = [0, 1, 2, 3]
         if partial_dataset:
-            images_per_class = 5
+            images_per_class = 500
             # Split is retained only if trained on full dataset. Change this condition if you compute a split for a part of the dataset.
             same_split = False
         else:
@@ -159,8 +159,8 @@ if __name__ == '__main__':
                                                )
         # Agent initialization
         if load_checkpoint:
-            directory = 'models/RL/20210428-125328'
-            old_epochs = 28
+            directory = 'models/RL/20210515-120754'
+            old_epochs = 10
             print('Loading checkpoint. Number of old epochs: %d' % old_epochs)
             """summarizer=dict(
                                                         directory='data/summaries',
@@ -271,7 +271,8 @@ if __name__ == '__main__':
                     # Episode loop
                     while not terminal:
                         action = agent.act(states=dict(features=state['features']), deterministic=False)
-                        environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
+                        class_distr = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
+                        environment.environment.set_agent_classification([x / sum(class_distr[:10]) for x in class_distr[:10]])
                         state, terminal, reward = environment.execute(actions=action)
                         agent.observe(terminal=terminal, reward=reward)
                         if terminal:
@@ -321,7 +322,9 @@ if __name__ == '__main__':
                     while not terminal:
                         action, internals_valid = agent.act(states=dict(features=state['features']), internals=internals_valid,
                                                             independent=True, deterministic=True)
-                        valid_environment.environment.set_agent_classification(agent.tracked_tensors()['agent/policy/action_distribution/probabilities'])
+                        class_distr = agent.tracked_tensors()['agent/policy/action_distribution/probabilities']
+                        valid_environment.environment.set_agent_classification(
+                            [x / sum(class_distr[:10]) for x in class_distr[:10]])
                         state, terminal, reward = valid_environment.execute(actions=action)
                         if terminal:
                             if action == valid_labels[i-1]:
