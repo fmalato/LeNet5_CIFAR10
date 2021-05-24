@@ -21,7 +21,8 @@ if __name__ == '__main__':
         batch_size = 50
         sampling_ratio = 0.99
         discount = 0.999
-        num_classes = 10
+        num_classes = 100
+        num_features = 237
         lstm_units = 128
         lstm_horizon = 5
         steps_per_episode = 15
@@ -43,7 +44,7 @@ if __name__ == '__main__':
         num_epochs = 1
         partial_dataset = False
         if partial_dataset:
-            images_per_class = 50
+            images_per_class = 5
         else:
             images_per_class = 1000
         heatmap_needed = True
@@ -54,10 +55,13 @@ if __name__ == '__main__':
             net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
             net.load_weights('models/model_CIFAR10/20210421-123951.h5')
             # Dataset initialization
-            (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+            if num_classes == 10:
+                (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+            else:
+                (train_images, train_labels), (test_images, test_labels) = datasets.cifar100.load_data()
             test_images = np.array(test_images, dtype=np.float32)
             if partial_dataset:
-                img_idxs = n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=len(class_names))
+                img_idxs = n_images_per_class_new(n=images_per_class, labels=test_labels, num_classes=num_classes)
                 test_images = np.array([test_images[idx] for idx in img_idxs])
                 test_labels = np.array([test_labels[idx] for idx in img_idxs])
             test_images = test_images / 255.0
@@ -81,7 +85,8 @@ if __name__ == '__main__':
                                           labels=test_labels,
                                           images=RGB_images,
                                           layers=layers,
-                                          # TODO: this doesn't work
+                                          num_features=num_features,
+                                          num_classes=num_classes,
                                           max_steps=steps_per_episode,
                                           visualize=visualize,
                                           training=False,
@@ -95,12 +100,13 @@ if __name__ == '__main__':
         num_actions = len(environment.actions)
         environment = Environment.create(environment=environment,
                                          states=dict(
-                                             features=dict(type=float, shape=(147,)),
+                                             features=dict(type=float, shape=(num_features,)),
                                          ),
                                          actions=dict(type=int, num_values=num_actions+num_classes),
                                          max_episode_timesteps=steps_per_episode
                                          )
-        dirs = ['models/RL/20210516-110646']
+        dirs = ['models/RL_CIFAR-100/20210519-150758', 'models/RL_CIFAR-100/20210519-153138',
+                'models/RL_CIFAR-100/20210519-161151', 'models/RL_CIFAR-100/20210519-163118']
         for directory in dirs:
             check_dir = directory + '/checkpoints/'
             print('\nTesting {dir}'.format(dir=directory))
@@ -122,7 +128,7 @@ if __name__ == '__main__':
                                                     tracking=['distribution'],
                                                     discount=discount,
                                                     states=dict(
-                                                        features=dict(type=float, shape=(147,)),
+                                                        features=dict(type=float, shape=(num_features,)),
                                                     ),
                                                     actions=dict(type=int, num_values=num_actions+num_classes),
                                                     max_episode_timesteps=steps_per_episode
@@ -166,14 +172,11 @@ if __name__ == '__main__':
                     ep_pos.append(str(environment.environment.agent_pos))
                     ep_actions.append(int(action))
                     # Marginalized distribution over classification actions
-                    distr = [x / sum(distrib[:10]) for x in distrib[:10]]
+                    distr = [x / sum(distrib[:num_classes]) for x in distrib[:num_classes]]
                     class_distrib[i].append(distr)
                     ###############################################
                     environment.environment.set_agent_classification(distr)
                     state, terminal, reward = environment.execute(actions=action)
-                    # TODO: terminal inhibition doesn't work
-                    """if int(action) >= 10:
-                        terminal = False"""
                     if terminal:
                         mov_histogram[0][current_step] += 1
                         if action == test_labels[i - 1]:
@@ -181,7 +184,7 @@ if __name__ == '__main__':
                         with tf.device('/device:CPU:0'):
                             pred = np.reshape(RGB_images[i-1], (1, 32, 32, 3))
                             pred = net(pred)
-                        if int(action) < 10:
+                        if int(action) < num_classes:
                             # Add a classification attempt
                             predicted_labels[i] = int(action)
                         else:
@@ -194,7 +197,7 @@ if __name__ == '__main__':
                         baseline_labels[i] = int(np.argmax(pred))
                         agent_positions[i] = ep_pos
                         actions[i] = ep_actions
-                    if int(action) < 10:
+                    if int(action) < num_classes:
                         class_attempt += 1
                     ep_reward += reward
                     current_step += 1
@@ -262,4 +265,4 @@ if __name__ == '__main__':
             print('    where agent and baseline predict different classes: %d / %d' % (different_class, len(test_labels)))
             print('Number of times that baseline produces correct output when agent does not classify: %d / %d' % (right, len(only_baseline)))
             if heatmap_needed:
-                build_heatmap(agent_positions, dir=directory, show=True, all_epochs=False)
+                build_heatmap(agent_positions, dir=directory, show=False, all_epochs=False)

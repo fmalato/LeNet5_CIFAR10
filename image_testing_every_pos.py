@@ -23,8 +23,8 @@ if __name__ == "__main__":
     batch_size = 50
     sampling_ratio = 0.99
     discount = 0.999
-    num_classes = 10
-    num_features = 147
+    num_classes = 100
+    num_features = 237
     lstm_units = 128
     lstm_horizon = 5
     steps_per_episode = 15
@@ -47,16 +47,19 @@ if __name__ == "__main__":
         net = DyadicConvNet(num_channels=64, input_shape=(1, 32, 32, 3))
         net.load_weights('models/model_CIFAR10/20210421-123951.h5')
         # Dataset initialization
-        (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+        if num_classes == 10:
+            (train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+        else:
+            (train_images, train_labels), (test_images, test_labels) = datasets.cifar100.load_data()
         test_images = np.array(test_images, dtype=np.float32)
-        image_idxs = n_images_per_class_new(n=1, labels=test_labels, num_classes=10)
+        image_idxs = n_images_per_class_new(n=1, labels=test_labels, num_classes=num_classes)
         all_data = {}
         del train_images, train_labels
         for image_index in image_idxs:
             print('\nTesting image {idx}'.format(idx=image_index))
             test_image = test_images[image_index]
             test_image = test_image / 255.0
-            test_labels = [test_labels[x] for x in image_idxs]
+            test_label = test_labels[image_index]
             # Initializing everything that the env requires to work properly
             RGB_image = [copy.deepcopy(test_image)]
             tmp = []
@@ -68,10 +71,10 @@ if __name__ == "__main__":
             #########################################################################
             # Environment initialization
             environment = DyadicConvnetGymEnv(dataset=test_image,
-                                              labels=test_labels[image_index],
+                                              labels=test_label,
                                               images=RGB_image,
                                               layers=layers,
-                                              num_classes=10,
+                                              num_classes=num_classes,
                                               num_features=num_features,
                                               max_steps=steps_per_episode,
                                               visualize=visualize,
@@ -92,11 +95,12 @@ if __name__ == "__main__":
                                              max_episode_timesteps=steps_per_episode
                                              )
             # Agent initialization
-            dirs = ['models/RL/20210515-120754']
+            dirs = ['models/RL_CIFAR-100/20210519-150758', 'models/RL_CIFAR-100/20210519-153138',
+                    'models/RL_CIFAR-100/20210519-161151', 'models/RL_CIFAR-100/20210519-163118']
             for directory in dirs:
                 check_dir = directory + '/checkpoints/'
                 print('\nTesting {dir}'.format(dir=directory))
-                old_epochs = 10
+                old_epochs = 20
                 agent = Agent.load(directory=check_dir,
                                    filename='agent-{oe}'.format(oe=old_epochs - 1),
                                    format='hdf5',

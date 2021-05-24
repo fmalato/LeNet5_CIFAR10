@@ -15,6 +15,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from keras.losses import CategoricalCrossentropy
 from tensorflow.keras import datasets
 
+#TODO: VOXELS
 
 # Check execution time of a line/block of lines
 class TimeCounter:
@@ -595,13 +596,53 @@ def num_different_patterns(dir_path, filepath):
                 actions.append(str(data[key][k]["actions"][:len(data[key][k]["actions"]) - 1]))
     print(len(list(dict.fromkeys(actions))))
 
+
+def plot_voxels_path(position, filename):
+    x, y, z = np.indices((20, 20, 60))
+    if position[0] == 0:
+        offset = 2
+        z_ax = (0, 1)
+    elif position[0] == 1:
+        offset = 6
+        z_ax = (15, 16)
+    elif position[0] == 2:
+        offset = 8
+        z_ax = (30, 31)
+    else:
+        offset = 9
+        z_ax = (40, 41)
+
+    layer_0 = (x >= 2) & (x < 18) & (y >= 2) & (y < 18) & (z < 1)
+    layer_1 = (x >= 6) & (x < 14) & (y >= 6) & (y < 14) & (z >= 15) & (z < 16)
+    layer_2 = (x >= 8) & (x < 12) & (y >= 8) & (y < 12) & (z >= 30) & (z < 31)
+    layer_3 = (x >= 9) & (x < 11) & (y >= 9) & (y < 11) & (z >= 40) & (z < 41)
+    pos = (x >= position[1] + offset) & (x < position[1] + 1 + offset) & \
+          (y >= position[2] + offset) & (y < position[2] + 1 + offset) & \
+          (z >= z_ax[0]) & (z < z_ax[1])
+
+    voxels = layer_0 | layer_1 | layer_2 | layer_3 | pos
+
+    colors = np.empty(voxels.shape, dtype=object)
+    colors[layer_0] = 'blue'
+    colors[layer_1] = 'blue'
+    colors[layer_2] = 'blue'
+    colors[layer_3] = 'blue'
+    colors[pos] = 'red'
+    ax = plt.figure().add_subplot(projection='3d')
+    ax.voxels(voxels, facecolors=colors, edgecolor='k')
+    ax.auto_scale_xyz(X=x, Y=y, Z=z)
+    ax.set_title('Current position: {pos}'.format(pos=position))
+
+    plt.savefig('voxels/{fname}.png'.format(fname=filename))
+
 # plot_mov_histogram(dir_path='models/RL/20210428-125328/stats/', filepath='movement_histogram_test.json', nrows=1, ncols=1)
-#analyze_distributions('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#analyze_distributions('models/RL_CIFAR-100/{x}/stats/'.format(x=el), 'predicted_labels.json')
 #error_corr_matrix('models/RL/20210515-120754/stats/', 'predicted_labels.json')
-#classification_position('models/RL/20210515-120754/stats/', 'predicted_labels.json')
+#classification_position('models/RL_CIFAR-100/{x}/stats/'.format(x=el), 'predicted_labels.json')
 #heatmap_per_class('models/RL/20210428-125328/stats/', 'predicted_labels.json')
 #heatmap_before_classification('models/RL/20210515-120754/stats/', 'predicted_labels.json')
-#distributions_over_time('models/RL/20210515-120754/stats/', 'predicted_labels.json', plot=False)
+"""for el in os.listdir('models/RL_CIFAR-100/'):
+    distributions_over_time('models/RL_CIFAR-100/{x}/stats/'.format(x=el), 'predicted_labels.json', plot=True)"""
 #each_position('models/RL/20210428-125328/stats/', 'each_position.json')
 #image_grid(2, 2, 'models/RL/20210428-125328/heatmaps/', 'heatmap_grid')
 """#with open('models/RL/20210515-120754/stats/each_position.json', 'r') as f:

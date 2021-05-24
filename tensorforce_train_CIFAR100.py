@@ -110,6 +110,9 @@ if __name__ == '__main__':
             print('\nDone.\n')
             #########################################################################
         for pol_lr, bas_lr in zip(policy_lr, baseline_lr):
+            parameters = [batch_size, sampling_ratio, discount, lstm_units, lstm_horizon, steps_per_episode, pol_lr,
+                      bas_lr, e_r, split_ratio, class_penalty, correct_class, illegal_mov, same_position,
+                      non_classified, images_per_class, "{x}".format(x=layers), step_reward_multiplier]
             print('Policy lr: {plr} - Baseline lr: {blr}'.format(plr=pol_lr, blr=bas_lr))
             # Shuffling everything there is to shuffle
             train_images, train_labels, train_RGB_imgs = shuffle_data(dataset=train_images, labels=train_labels,
