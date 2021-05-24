@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # Indices of the images in each_position.json that have to be animated
     idxs = [460, 662]
     # Positions of interest for each image
-    starting_positions = ['(0, 7, 8']
+    starting_positions = ['(0, 7, 8)']
     with open('../models/RL/20210428-125328/stats/each_position.json', 'r') as f:
         data = json.load(f)
         f.close()
